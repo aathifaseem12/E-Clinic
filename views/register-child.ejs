@@ -52,7 +52,10 @@
           <input type="text" name="childName" maxlength="100" required>
 
           <label>Date of birth <span class="req">*</span></label>
-          <input type="date" name="dob" required>
+          <% // HTML date-picker limit; server.js still validates submitted dates. %>
+          <% const currentDate = new Date(); %>
+          <% const latestBirthDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`; %>
+          <input type="date" name="dob" max="<%= latestBirthDate %>" required>
 
           <label>Sex <span class="req">*</span></label>
           <select name="sex" required>
