@@ -257,31 +257,20 @@
           <label>Password</label>
           <input type="password" name="password" placeholder="At least 8 characters" required>
 
-          <label>I am a</label>
-          <input type="hidden" name="role" id="role-input" value="parent">
-          <div class="role-tabs">
-            <div class="role-tab active" data-role="parent" id="tab-parent">
+          <label>Account type</label>
+          <input type="hidden" name="role" value="parent">
+          <div class="role-tabs" style="grid-template-columns:1fr;">
+            <div class="role-tab active">
               <i class="fa-solid fa-people-roof"></i>
               <span>Parent</span>
             </div>
-            <div class="role-tab" data-role="worker" id="tab-worker">
-              <i class="fa-solid fa-user-doctor"></i>
-              <span>Health worker</span>
-            </div>
           </div>
+          <p class="id-hint" style="margin-top:12px;">Health worker accounts cannot be created through public signup. Existing health workers can log in normally.</p>
 
-          <div class="id-fields visible" id="parent-fields">
-            <label>NIC number <span class="req">*</span></label>
-            <input type="text" name="nic" id="nic-input" data-id="true" placeholder="e.g. 199912345678">
+          <div class="id-fields visible">
+            <label for="nic-input">NIC number <span class="req">*</span></label>
+            <input type="text" name="nic" id="nic-input" data-id="true" placeholder="e.g. 199912345678" required>
             <p class="id-hint">Used by health workers to look up your child's record.</p>
-          </div>
-
-          <div class="id-fields" id="worker-fields">
-            <label>NIC number <span class="req">*</span></label>
-            <input type="text" name="nic_worker" id="nic-worker-input" data-id="true" placeholder="e.g. 199912345678">
-            <label>SLMC registration number <span class="req">*</span></label>
-            <input type="text" name="slmcNumber" id="slmc-input" data-id="true" placeholder="e.g. SLMC 45231">
-            <p class="id-hint">Both are required to verify you as a registered health worker.</p>
           </div>
 
           <button type="submit"><i class="fa-solid fa-arrow-right-to-bracket"></i>&nbsp; Create account</button>
@@ -292,48 +281,5 @@
     </div>
   </div>
 
-  <script>
-    const tabParent = document.getElementById('tab-parent');
-    const tabWorker = document.getElementById('tab-worker');
-    const roleInput = document.getElementById('role-input');
-    const parentFields = document.getElementById('parent-fields');
-    const workerFields = document.getElementById('worker-fields');
-    const nicInput = document.getElementById('nic-input');
-    const nicWorkerInput = document.getElementById('nic-worker-input');
-    const slmcInput = document.getElementById('slmc-input');
-    const form = document.getElementById('signup-form');
-
-    function setRole(role) {
-      roleInput.value = role;
-      if (role === 'parent') {
-        tabParent.classList.add('active');
-        tabWorker.classList.remove('active');
-        parentFields.classList.add('visible');
-        workerFields.classList.remove('visible');
-        nicInput.required = true;
-        nicWorkerInput.required = false;
-        slmcInput.required = false;
-      } else {
-        tabWorker.classList.add('active');
-        tabParent.classList.remove('active');
-        workerFields.classList.add('visible');
-        parentFields.classList.remove('visible');
-        nicWorkerInput.required = true;
-        slmcInput.required = true;
-        nicInput.required = false;
-      }
-    }
-
-    tabParent.addEventListener('click', () => setRole('parent'));
-    tabWorker.addEventListener('click', () => setRole('worker'));
-
-    form.addEventListener('submit', () => {
-      if (roleInput.value === 'worker') {
-        nicInput.value = nicWorkerInput.value;
-      }
-    });
-
-    setRole('parent');
-  </script>
 </body>
 </html>

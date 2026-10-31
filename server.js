@@ -93,17 +93,17 @@ app.get('/signup', (req, res) => {
 });
 
 app.post('/signup', async (req, res) => {
-  const { name, email, password, role, nic, slmcNumber } = req.body;
+  const { name, email, password, role, nic } = req.body;
 
-  if (!nic || nic.trim() === '') {
-    return res.render('signup', {
-      error: role === 'worker'
-        ? 'NIC Number is required for health worker accounts.'
-        : 'NIC Number is required for parent accounts.'
+  // Public signup is only for parents. Never trust a role submitted by the browser:
+  // hidden fields and POST bodies can be edited by anyone.
+  if (role !== 'parent') {
+    return res.status(403).render('signup', {
+      error: 'Health worker accounts cannot be created using public signup.'
     });
   }
-  if (role === 'worker' && (!slmcNumber || slmcNumber.trim() === '')) {
-    return res.render('signup', { error: 'SLMC Registration Number is required for health worker accounts.' });
+  if (typeof nic !== 'string' || nic.trim() === '') {
+    return res.render('signup', { error: 'NIC Number is required for parent accounts.' });
   }
 
   try {
@@ -111,18 +111,12 @@ app.post('/signup', async (req, res) => {
     const insertUser = db.prepare(
       'INSERT INTO users (name, email, password, role, nic, slmc_number) VALUES (?, ?, ?, ?, ?, ?)'
     );
-    insertUser.run(
-      name,
-      email,
-      hashedPassword,
-      role,
-      nic,
-      role === 'worker' ? slmcNumber : null
-    );
+    // Assign the only permitted role on the server, never from req.body.
+    insertUser.run(name, email, hashedPassword, 'parent', nic, null);
     res.redirect('/login');
   } catch (err) {
     console.log(err);
-    res.render('signup', { error: 'That email, NIC, or SLMC number is already registered.' });
+    res.render('signup', { error: 'That email or NIC is already registered.' });
   }
 });
 
