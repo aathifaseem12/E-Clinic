@@ -1,6 +1,13 @@
 const Database = require('better-sqlite3');
 const db = new Database('eclinic.db');
 
+// SQLite does not enforce declared foreign keys unless enabled per connection.
+// Enable them before executing any application writes or schema migrations.
+db.pragma('foreign_keys = ON');
+if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+  throw new Error('SQLite foreign-key enforcement could not be enabled.');
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,6 +76,21 @@ db.exec(`
 const vaccineColumns = db.prepare('PRAGMA table_info(vaccines)').all();
 if (!vaccineColumns.some(column => column.name === 'is_custom')) {
   db.exec('ALTER TABLE vaccines ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0');
+}
+
+// Index the child relationships used by dashboards and worker search tools.
+// CREATE INDEX IF NOT EXISTS is safe to run on both new and existing databases.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_children_parent_id ON children(parent_id);
+  CREATE INDEX IF NOT EXISTS idx_growth_child_date ON growth_records(child_id, date);
+  CREATE INDEX IF NOT EXISTS idx_vaccines_child_due_date ON vaccines(child_id, due_date);
+`);
+
+// Existing data was originally written without guaranteed foreign-key checks.
+// Detect historical orphan records without deleting or changing them.
+const relationshipIssues = db.pragma('foreign_key_check');
+if (relationshipIssues.length > 0) {
+  console.warn(`Database warning: ${relationshipIssues.length} existing foreign-key violation(s) found. No data was changed. Review the database backup before correcting these records.`);
 }
 
 console.log('Database and tables created successfully!');
