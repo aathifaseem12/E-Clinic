@@ -95,9 +95,21 @@ The database has four principal tables: `users`, `children`, `growth_records` an
 - Production deployment requires HTTPS and a private `ECLINIC_SESSION_SECRET` of at least 32 characters. The sample setup above is for local demonstration only.
 - There is **no built-in administrator interface for provisioning new health-worker accounts**. Existing worker accounts can log in.
 - Existing standard vaccine schedules are demonstration application data; **do not treat them as official medical guidance**.
-- No comprehensive automated test suite is included in the current repository. Run the manual checks below before demonstrating the application.
+- Automated HTTP/SQL regression tests are available using `npm test` on Node.js 22 or newer. They use an in-memory SQLite database and synthetic accounts, leaving your local `eclinic.db` untouched. They do not replace real-browser/mobile testing.
 
 **Privacy:** Do not commit real patient information, NICs, passwords, session secrets, or the SQLite database. Capture screenshots with fictitious test data only.
+
+## Running automated checks
+
+From the project folder on Node.js 22 or newer, after `npm ci`:
+
+```powershell
+npm test
+```
+
+The tests exercise real Express/EJS routes, CSRF, sessions, login, registration, child/growth records, vaccine CRUD, permission checks and SQL foreign keys. To ensure no real child-health data is altered, the test suite substitutes Node's `node:sqlite` in-memory driver for the production `better-sqlite3` connection. It does **not** run against your local `eclinic.db`. In some Node.js 22 versions, an experimental SQLite warning is expected.
+
+You must still test the browser layout, search/filter controls and the production SQLite native module separately.
 
 ## Manual demo checklist
 
