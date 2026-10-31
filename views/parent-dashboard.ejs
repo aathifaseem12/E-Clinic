@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Parent Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -15,6 +16,7 @@
       transition: border-color 0.15s, transform 0.15s;
     }
     .child-select-card:hover { border-color: var(--clinic); transform: translateY(-2px); }
+    .child-select-card:focus-visible, .metric-box:focus-visible { outline: 3px solid var(--clinic); outline-offset: 3px; }
     .child-select-card .avatar {
       width: 46px; height: 46px;
       border-radius: 50%;
@@ -132,7 +134,7 @@
           const childUpcoming = child.vaccines.filter(v => !v.completed && new Date(v.due_date) >= today).length;
           const childOverdue = child.vaccines.filter(v => !v.completed && new Date(v.due_date) < today).length;
         %>
-          <div class="child-select-card" onclick="showChild(<%= index %>)">
+          <div class="child-select-card" role="button" tabindex="0" aria-label="View records for <%= child.name %>" onclick="showChild(<%= index %>)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showChild(<%= index %>); }">
             <div class="avatar"><i class="fa-solid fa-baby"></i></div>
             <h3><%= child.name %></h3>
             <div class="meta">
@@ -182,7 +184,7 @@
 
               <!-- Preview boxes: click to expand full chart -->
               <div class="growth-picker-row" id="growth-picker-<%= index %>">
-                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'weight-age')">
+                <div class="metric-box" role="button" tabindex="0" aria-label="View full weight by age chart" onclick="showGrowthDetail(<%= index %>, 'weight-age')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showGrowthDetail(<%= index %>, 'weight-age'); }">
                   <div class="metric-box-head">
                     <span class="label"><i class="fa-solid fa-weight-scale"></i> Weight (by age)</span>
                     <% if (earlyRecs.length > 0) { %>
@@ -199,7 +201,7 @@
                   </div>
                 </div>
 
-                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'height')">
+                <div class="metric-box" role="button" tabindex="0" aria-label="View full height by age chart" onclick="showGrowthDetail(<%= index %>, 'height')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showGrowthDetail(<%= index %>, 'height'); }">
                   <div class="metric-box-head">
                     <span class="label"><i class="fa-solid fa-ruler-vertical"></i> Height</span>
                     <span class="latest"><%= child.growthRecords[child.growthRecords.length - 1].height_cm %> cm</span>
@@ -208,7 +210,7 @@
                   <div class="hint">Tap to see full chart vs WHO standard</div>
                 </div>
 
-                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'weight-height')">
+                <div class="metric-box" role="button" tabindex="0" aria-label="View full weight by height chart" onclick="showGrowthDetail(<%= index %>, 'weight-height')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showGrowthDetail(<%= index %>, 'weight-height'); }">
                   <div class="metric-box-head">
                     <span class="label"><i class="fa-solid fa-weight-scale"></i> Weight vs Height</span>
                     <span class="latest"><%= child.growthRecords[child.growthRecords.length - 1].weight_kg %> kg</span>
@@ -272,6 +274,7 @@
                 <canvas id="weight-height-chart-<%= index %>" height="280"></canvas>
               </div>
 
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Growth record history">
               <table style="margin-top:16px;">
                 <tr>
                   <th>Date</th>
@@ -290,12 +293,14 @@
                   </tr>
                 <% }); %>
               </table>
+              </div>
             <% } %>
 
             <h4><i class="fa-solid fa-syringe"></i>Vaccination Schedule</h4>
             <% if (child.vaccines.length === 0) { %>
               <p>No vaccine schedule yet.</p>
             <% } else { %>
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Vaccination schedule">
               <table>
                 <tr>
                   <th>Vaccine</th>
@@ -343,6 +348,7 @@
                   <% } %>
                 <% }); %>
               </table>
+              </div>
             <% } %>
           </div>
         </div>

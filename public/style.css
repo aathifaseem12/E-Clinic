@@ -283,3 +283,37 @@ tr:hover td { background: var(--paper-dark); }
   cursor: pointer;
 }
 .step-pill.active { background: #EAF2F1; border-color: var(--clinic); color: var(--clinic-dark); font-weight: 600; }
+
+/* Fix 9: narrow screens, keyboard focus, and wide clinical data tables. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll table { min-width: 600px; }
+.table-scroll:focus-visible { outline: 2px solid var(--clinic); outline-offset: 2px; }
+
+@media (max-width: 700px) {
+  nav {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  nav > div:last-child {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  nav a, nav .nav-logout-form { margin-left: 0; }
+  .container { padding: 22px 14px 44px; }
+  .card { padding: 20px 16px; }
+  .card::before { left: 16px; right: 16px; }
+  .tile-grid { grid-template-columns: 1fr; }
+  h1 { font-size: clamp(23px, 6vw, 30px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .child-select-card, .metric-box { transition: none; }
+}

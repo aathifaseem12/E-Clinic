@@ -174,7 +174,7 @@ const VACCINE_SELECT = `
 `;
 
 app.get('/', (req, res) => {
-  res.send('E-Clinic server is running!');
+  return res.redirect(req.session.userId ? '/dashboard' : '/login');
 });
 
 app.get('/signup', (req, res) => {
