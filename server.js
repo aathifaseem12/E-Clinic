@@ -22,10 +22,12 @@ function requireLogin(req, res, next) {
   next();
 }
 
-// Only health workers may change vaccine records.
+// Every health-worker page and write operation must be authorized on the server.
+// Look up the current role instead of trusting a potentially stale session role.
 function requireWorker(req, res, next) {
   if (!req.session.userId) return res.redirect('/login');
-  if (req.session.userRole !== 'worker') {
+  const account = db.prepare('SELECT role FROM users WHERE id = ?').get(req.session.userId);
+  if (!account || account.role !== 'worker') {
     return res.status(403).send('Health worker access required.');
   }
   next();
@@ -181,16 +183,18 @@ app.get('/dashboard', requireLogin, (req, res) => {
     });
 
     res.render('parent-dashboard', { children: childrenWithData, userName: req.session.userName });
-  } else {
+  } else if (req.session.userRole === 'worker') {
     res.render('worker-dashboard', { userName: req.session.userName });
+  } else {
+    res.status(403).send('Unknown account role.');
   }
 });
 
-app.get('/register-child', requireLogin, (req, res) => {
+app.get('/register-child', requireWorker, (req, res) => {
   res.render('register-child', { parent: null, error: null, success: null });
 });
 
-app.post('/register-child/search', requireLogin, (req, res) => {
+app.post('/register-child/search', requireWorker, (req, res) => {
   const { nic } = req.body;
   const parent = db.prepare('SELECT * FROM users WHERE nic = ? AND role = ?').get(nic, 'parent');
 
@@ -201,7 +205,7 @@ app.post('/register-child/search', requireLogin, (req, res) => {
   res.render('register-child', { parent, error: null, success: null });
 });
 
-app.post('/register-child/save', requireLogin, (req, res) => {
+app.post('/register-child/save', requireWorker, (req, res) => {
   const { parentId, childName, dob, sex } = req.body;
   const countResult = db.prepare('SELECT COUNT(*) AS count FROM children WHERE parent_id = ?').get(parentId);
   const birthOrder = countResult.count + 1;
@@ -228,11 +232,11 @@ app.post('/register-child/save', requireLogin, (req, res) => {
   res.render('register-child', { parent: null, error: null, success: `${childName} registered successfully as child #${birthOrder}! EPI vaccine schedule created.` });
 });
 
-app.get('/add-growth', requireLogin, (req, res) => {
+app.get('/add-growth', requireWorker, (req, res) => {
   res.render('add-growth', { parent: null, children: null, error: null, success: null });
 });
 
-app.post('/add-growth/search', requireLogin, (req, res) => {
+app.post('/add-growth/search', requireWorker, (req, res) => {
   const { nic } = req.body;
   const parent = db.prepare('SELECT * FROM users WHERE nic = ? AND role = ?').get(nic, 'parent');
 
@@ -249,7 +253,7 @@ app.post('/add-growth/search', requireLogin, (req, res) => {
   res.render('add-growth', { parent, children, error: null, success: null });
 });
 
-app.post('/add-growth/save', requireLogin, (req, res) => {
+app.post('/add-growth/save', requireWorker, (req, res) => {
   const { childId, date, weight, height } = req.body;
 
   db.prepare(
@@ -259,11 +263,11 @@ app.post('/add-growth/save', requireLogin, (req, res) => {
   res.render('add-growth', { parent: null, children: null, error: null, success: 'Growth record added successfully!' });
 });
 
-app.get('/manage-vaccines', requireLogin, (req, res) => {
+app.get('/manage-vaccines', requireWorker, (req, res) => {
   res.render('manage-vaccines', { parent: null, children: null, selectedChild: null, vaccines: null, error: null, success: null });
 });
 
-app.post('/manage-vaccines/search', requireLogin, (req, res) => {
+app.post('/manage-vaccines/search', requireWorker, (req, res) => {
   const { nic } = req.body;
   const parent = db.prepare('SELECT * FROM users WHERE nic = ? AND role = ?').get(nic, 'parent');
 
@@ -280,7 +284,7 @@ app.post('/manage-vaccines/search', requireLogin, (req, res) => {
   res.render('manage-vaccines', { parent, children, selectedChild: null, vaccines: null, error: null, success: null });
 });
 
-app.post('/manage-vaccines/select-child', requireLogin, (req, res) => {
+app.post('/manage-vaccines/select-child', requireWorker, (req, res) => {
   const { childId } = req.body;
   const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
   const vaccines = db.prepare(VACCINE_SELECT).all(childId);
@@ -288,7 +292,7 @@ app.post('/manage-vaccines/select-child', requireLogin, (req, res) => {
   res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: null });
 });
 
-app.post('/manage-vaccines/complete', requireLogin, (req, res) => {
+app.post('/manage-vaccines/complete', requireWorker, (req, res) => {
   const { vaccineId, childId, sideEffects, severity } = req.body;
   const today = new Date().toISOString().split('T')[0];
   const hasSideEffect = sideEffects && sideEffects.trim() !== '';
@@ -315,7 +319,7 @@ app.post('/manage-vaccines/complete', requireLogin, (req, res) => {
 
 // Report (or update) a side effect on a vaccine that was already completed —
 // covers reactions that only show up days after the dose was given.
-app.post('/manage-vaccines/report-reaction', requireLogin, (req, res) => {
+app.post('/manage-vaccines/report-reaction', requireWorker, (req, res) => {
   const { vaccineId, childId, sideEffects, severity } = req.body;
   const today = new Date().toISOString().split('T')[0];
 
