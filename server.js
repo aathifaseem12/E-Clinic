@@ -71,11 +71,33 @@ function renderVaccineList(res, childId, message, isError = false) {
   const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
   if (!selectedChild) return res.status(404).send('Child not found.');
   const vaccines = db.prepare(VACCINE_SELECT).all(childId);
-  return res.render('manage-vaccines', {
+  return res.status(isError ? 400 : 200).render('manage-vaccines', {
     parent: null, children: null, selectedChild, vaccines,
     error: isError ? message : null,
     success: isError ? null : message
   });
+}
+
+// Validate optional reaction details even when requests bypass the browser form.
+function parseVaccineReaction(body, required = false) {
+  const input = body.sideEffects;
+  if (input !== undefined && typeof input !== 'string') {
+    return { error: 'Reaction details must be text.' };
+  }
+  const description = (input || '').trim();
+  if (description.length > 1000) {
+    return { error: 'Reaction details must be 1000 characters or fewer.' };
+  }
+  if (required && !description) {
+    return { error: 'Enter a reaction description.' };
+  }
+  if (description && !['mild', 'moderate', 'severe'].includes(body.severity)) {
+    return { error: 'Choose a valid reaction severity.' };
+  }
+  return {
+    description: description || null,
+    severity: description ? body.severity : null
+  };
 }
 
 const VACCINE_SCHEDULE = [
@@ -338,99 +360,129 @@ app.get('/manage-vaccines', requireWorker, (req, res) => {
 });
 
 app.post('/manage-vaccines/search', requireWorker, (req, res) => {
-  const { nic } = req.body;
-  const parent = db.prepare('SELECT * FROM users WHERE nic = ? AND role = ?').get(nic, 'parent');
-
+  const nic = typeof req.body?.nic === 'string' ? req.body.nic.trim().toUpperCase() : '';
+  if (!nic || nic.length > 12) {
+    return res.status(400).render('manage-vaccines', {
+      parent: null, children: null, selectedChild: null, vaccines: null,
+      error: 'Enter a valid parent NIC number.', success: null
+    });
+  }
+  const parent = db.prepare('SELECT * FROM users WHERE nic = ? COLLATE NOCASE AND role = ?').get(nic, 'parent');
   if (!parent) {
-    return res.render('manage-vaccines', { parent: null, children: null, selectedChild: null, vaccines: null, error: 'No parent found with that NIC.', success: null });
+    return res.render('manage-vaccines', {
+      parent: null, children: null, selectedChild: null, vaccines: null,
+      error: 'No parent found with that NIC.', success: null
+    });
   }
-
   const children = db.prepare('SELECT * FROM children WHERE parent_id = ?').all(parent.id);
-
   if (children.length === 0) {
-    return res.render('manage-vaccines', { parent: null, children: null, selectedChild: null, vaccines: null, error: 'This parent has no registered children yet.', success: null });
+    return res.render('manage-vaccines', {
+      parent: null, children: null, selectedChild: null, vaccines: null,
+      error: 'This parent has no registered children yet.', success: null
+    });
   }
-
-  res.render('manage-vaccines', { parent, children, selectedChild: null, vaccines: null, error: null, success: null });
+  return res.render('manage-vaccines', {
+    parent, children, selectedChild: null, vaccines: null, error: null, success: null
+  });
 });
 
 app.post('/manage-vaccines/select-child', requireWorker, (req, res) => {
-  const { childId } = req.body;
+  const { childId } = req.body || {};
+  if (!validId(childId)) return res.status(400).send('Invalid child ID.');
   const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
+  if (!selectedChild) return res.status(404).send('Child not found.');
   const vaccines = db.prepare(VACCINE_SELECT).all(childId);
-
-  res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: null });
+  return res.render('manage-vaccines', {
+    parent: null, children: null, selectedChild, vaccines, error: null, success: null
+  });
 });
 
 app.post('/manage-vaccines/complete', requireWorker, (req, res) => {
-  const { vaccineId, childId, sideEffects, severity } = req.body;
-  const today = new Date().toISOString().split('T')[0];
-  const hasSideEffect = sideEffects && sideEffects.trim() !== '';
+  const { vaccineId, childId } = req.body || {};
+  if (!validId(vaccineId) || !validId(childId)) {
+    return res.status(400).send('Invalid vaccine or child ID.');
+  }
+  // Both identifiers must refer to the same record; never trust hidden form fields.
+  const vaccine = db.prepare('SELECT completed FROM vaccines WHERE id = ? AND child_id = ?').get(vaccineId, childId);
+  if (!vaccine) return res.status(404).send('Vaccine not found for this child.');
+  if (vaccine.completed) return renderVaccineList(res, childId, 'This vaccine is already completed.', true);
+  const reaction = parseVaccineReaction(req.body || {});
+  if (reaction.error) return renderVaccineList(res, childId, reaction.error, true);
 
-  db.prepare(`
-    UPDATE vaccines
-    SET completed = 1, completed_date = ?, completed_by = ?,
-        side_effects = ?, side_effect_severity = ?, side_effect_recorded_by = ?, side_effect_date = ?
-    WHERE id = ?
-  `).run(
-    today, req.session.userId,
-    hasSideEffect ? sideEffects.trim() : null,
-    hasSideEffect ? severity : null,
-    hasSideEffect ? req.session.userId : null,
-    hasSideEffect ? today : null,
-    vaccineId
-  );
-
-  const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
-  const vaccines = db.prepare(VACCINE_SELECT).all(childId);
-
-  res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: 'Vaccine marked as completed.' });
+  try {
+    const today = todayDate();
+    const result = db.prepare(`
+      UPDATE vaccines
+      SET completed = 1, completed_date = ?, completed_by = ?,
+          side_effects = ?, side_effect_severity = ?, side_effect_recorded_by = ?, side_effect_date = ?
+      WHERE id = ? AND child_id = ? AND completed = 0
+    `).run(
+      today, req.session.userId,
+      reaction.description, reaction.severity,
+      reaction.description ? req.session.userId : null,
+      reaction.description ? today : null,
+      vaccineId, childId
+    );
+    if (result.changes !== 1) return renderVaccineList(res, childId, 'This vaccine could not be marked completed.', true);
+    return renderVaccineList(res, childId, 'Vaccine marked as completed.');
+  } catch (err) {
+    console.error('Vaccine completion failed:', err);
+    return res.status(500).send('Unable to update the vaccination record.');
+  }
 });
 
-// Report (or update) a side effect on a vaccine that was already completed —
-// covers reactions that only show up days after the dose was given.
+// Reactions can only be reported for an existing completed dose belonging to the selected child.
 app.post('/manage-vaccines/report-reaction', requireWorker, (req, res) => {
-  const { vaccineId, childId, sideEffects, severity } = req.body;
-  const today = new Date().toISOString().split('T')[0];
+  const { vaccineId, childId } = req.body || {};
+  if (!validId(vaccineId) || !validId(childId)) {
+    return res.status(400).send('Invalid vaccine or child ID.');
+  }
+  const vaccine = db.prepare('SELECT completed FROM vaccines WHERE id = ? AND child_id = ?').get(vaccineId, childId);
+  if (!vaccine) return res.status(404).send('Vaccine not found for this child.');
+  if (!vaccine.completed) return renderVaccineList(res, childId, 'Mark this vaccine completed before reporting a reaction.', true);
+  const reaction = parseVaccineReaction(req.body || {}, true);
+  if (reaction.error) return renderVaccineList(res, childId, reaction.error, true);
 
-  db.prepare(`
-    UPDATE vaccines
-    SET side_effects = ?, side_effect_severity = ?, side_effect_recorded_by = ?, side_effect_date = ?
-    WHERE id = ?
-  `).run(sideEffects.trim(), severity, req.session.userId, today, vaccineId);
-
-  const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
-  const vaccines = db.prepare(VACCINE_SELECT).all(childId);
-
-  res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: 'Side effect recorded. This will be visible to any worker who views this child\'s record.' });
+  try {
+    const result = db.prepare(`
+      UPDATE vaccines
+      SET side_effects = ?, side_effect_severity = ?, side_effect_recorded_by = ?, side_effect_date = ?
+      WHERE id = ? AND child_id = ? AND completed = 1
+    `).run(reaction.description, reaction.severity, req.session.userId, todayDate(), vaccineId, childId);
+    if (result.changes !== 1) return renderVaccineList(res, childId, 'Reaction could not be saved.', true);
+    return renderVaccineList(res, childId, 'Reaction report saved.');
+  } catch (err) {
+    console.error('Vaccine reaction update failed:', err);
+    return res.status(500).send('Unable to update the reaction report.');
+  }
 });
 
 app.post('/manage-vaccines/add-custom', requireWorker, (req, res) => {
-  const { childId, vaccineName, dueDate } = req.body;
+  const { childId, vaccineName, dueDate } = req.body || {};
   const name = typeof vaccineName === 'string' ? vaccineName.trim() : '';
-  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0) {
-    return res.status(400).send('Invalid child ID.');
+  if (!validId(childId)) return res.status(400).send('Invalid child ID.');
+  if (!db.prepare('SELECT id FROM children WHERE id = ?').get(childId)) {
+    return res.status(404).send('Child not found.');
   }
   if (!name || name.length > 150 || !isValidDateOnly(dueDate)) {
     return renderVaccineList(res, childId, 'Enter a vaccine name (1–150 characters) and a valid due date.', true);
   }
-  if (!db.prepare('SELECT id FROM children WHERE id = ?').get(childId)) {
-    return res.status(404).send('Child not found.');
+  try {
+    db.prepare(
+      'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, is_custom, recorded_by) VALUES (?, ?, ?, 0, 1, ?)'
+    ).run(childId, name, dueDate, req.session.userId);
+    return renderVaccineList(res, childId, 'Custom vaccine added.');
+  } catch (err) {
+    console.error('Custom vaccine creation failed:', err);
+    return res.status(500).send('Unable to add the custom vaccine.');
   }
-
-  db.prepare(
-    'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, is_custom, recorded_by) VALUES (?, ?, ?, 0, 1, ?)'
-  ).run(childId, name, dueDate, req.session.userId);
-
-  return renderVaccineList(res, childId, 'Custom vaccine added.');
 });
 
-// Edit only uncompleted CUSTOM vaccine entries, never the generated EPI schedule.
+// Edit or delete only pending CUSTOM vaccine entries, never generated or completed doses.
 app.post('/manage-vaccines/edit-custom', requireWorker, (req, res) => {
-  const { childId, vaccineId, vaccineName, dueDate } = req.body;
+  const { childId, vaccineId, vaccineName, dueDate } = req.body || {};
   const name = typeof vaccineName === 'string' ? vaccineName.trim() : '';
-  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0 ||
-      !Number.isSafeInteger(Number(vaccineId)) || Number(vaccineId) <= 0) {
+  if (!validId(childId) || !validId(vaccineId)) {
     return res.status(400).send('Invalid record ID.');
   }
   const record = db.prepare(
@@ -440,24 +492,33 @@ app.post('/manage-vaccines/edit-custom', requireWorker, (req, res) => {
   if (!name || name.length > 150 || !isValidDateOnly(dueDate)) {
     return renderVaccineList(res, childId, 'Enter a vaccine name (1–150 characters) and a valid due date.', true);
   }
-  db.prepare(
-    'UPDATE vaccines SET vaccine_name = ?, due_date = ? WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
-  ).run(name, dueDate, vaccineId, childId);
-  return renderVaccineList(res, childId, 'Custom vaccine updated.');
+  try {
+    const result = db.prepare(
+      'UPDATE vaccines SET vaccine_name = ?, due_date = ? WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
+    ).run(name, dueDate, vaccineId, childId);
+    if (result.changes !== 1) return res.status(404).send('Editable custom vaccine not found.');
+    return renderVaccineList(res, childId, 'Custom vaccine updated.');
+  } catch (err) {
+    console.error('Custom vaccine update failed:', err);
+    return res.status(500).send('Unable to edit the custom vaccine.');
+  }
 });
 
-// Delete only uncompleted CUSTOM vaccine entries after explicit user confirmation.
 app.post('/manage-vaccines/delete-custom', requireWorker, (req, res) => {
-  const { childId, vaccineId } = req.body;
-  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0 ||
-      !Number.isSafeInteger(Number(vaccineId)) || Number(vaccineId) <= 0) {
+  const { childId, vaccineId } = req.body || {};
+  if (!validId(childId) || !validId(vaccineId)) {
     return res.status(400).send('Invalid record ID.');
   }
-  const result = db.prepare(
-    'DELETE FROM vaccines WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
-  ).run(vaccineId, childId);
-  if (result.changes === 0) return res.status(404).send('Deletable custom vaccine not found.');
-  return renderVaccineList(res, childId, 'Custom vaccine deleted.');
+  try {
+    const result = db.prepare(
+      'DELETE FROM vaccines WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
+    ).run(vaccineId, childId);
+    if (result.changes === 0) return res.status(404).send('Deletable custom vaccine not found.');
+    return renderVaccineList(res, childId, 'Custom vaccine deleted.');
+  } catch (err) {
+    console.error('Custom vaccine deletion failed:', err);
+    return res.status(500).send('Unable to delete the custom vaccine.');
+  }
 });
 
 const PORT = 3000;
