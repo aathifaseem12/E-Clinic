@@ -20,6 +20,24 @@
       padding: 8px; border-radius: 6px; border: 1px solid var(--line); resize: vertical;
     }
     .toggle-link { font-size: 12px; color: var(--clinic-dark); cursor: pointer; text-decoration: underline; }
+    .vaccine-controls {
+      display: grid;
+      grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 16px 0 8px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper-dark);
+    }
+    .vaccine-controls label { display: block; font-size: 12px; margin: 0 0 5px; }
+    .vaccine-controls input, .vaccine-controls select { width: 100%; margin: 0; }
+    .vaccine-results-count { font-size: 13px; color: var(--ink-soft); margin: 10px 0 0; }
+    .vaccine-row[hidden], #no-matching-vaccines[hidden] { display: none !important; }
+    #no-matching-vaccines { padding: 16px 0; color: var(--ink-soft); }
+    @media (max-width: 640px) {
+      .vaccine-controls { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -80,8 +98,38 @@
         <% if (!vaccines || vaccines.length === 0) { %>
           <p>No vaccines on record for this child.</p>
         <% } else { %>
+          <!-- Search/filter/sort affect only this child's displayed vaccinations. -->
+          <div class="vaccine-controls" role="search" aria-label="Find vaccination records">
+            <div>
+              <label for="vaccine-search">Search vaccine name</label>
+              <input id="vaccine-search" type="search" placeholder="e.g. BCG, measles" autocomplete="off">
+            </div>
+            <div>
+              <label for="vaccine-status-filter">Status</label>
+              <select id="vaccine-status-filter">
+                <option value="all">All statuses</option>
+                <option value="completed">Completed</option>
+                <option value="pending">All pending</option>
+                <option value="overdue">Overdue</option>
+                <option value="upcoming">Upcoming</option>
+              </select>
+            </div>
+            <div>
+              <label for="vaccine-sort">Sort by</label>
+              <select id="vaccine-sort">
+                <option value="date-asc">Due date: earliest</option>
+                <option value="date-desc">Due date: latest</option>
+                <option value="name-asc">Name: A–Z</option>
+                <option value="name-desc">Name: Z–A</option>
+              </select>
+            </div>
+          </div>
+          <p class="vaccine-results-count" id="vaccine-results-count" role="status" aria-live="polite"></p>
+          <div id="vaccine-list">
           <% vaccines.forEach((v, vi) => { %>
-            <div style="border-bottom:1px solid var(--line); padding:14px 0;">
+            <div class="vaccine-row" data-vaccine-name="<%= v.vaccine_name %>"
+                 data-due-date="<%= v.due_date %>" data-completed="<%= v.completed ? '1' : '0' %>"
+                 style="border-bottom:1px solid var(--line); padding:14px 0;">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
                 <div>
                   <strong><%= v.vaccine_name %></strong>
@@ -187,6 +235,8 @@
               <% } %>
             </div>
           <% }); %>
+          </div>
+          <p id="no-matching-vaccines" hidden>No vaccination records match your search or filters.</p>
         <% } %>
       </div>
 
@@ -204,5 +254,59 @@
       </div>
     <% } %>
   </div>
+  <% if (selectedChild && vaccines && vaccines.length > 0) { %>
+  <script>
+    // Search and sort the records already rendered for the selected child.
+    // No new database route or permission is needed; existing POST/CSRF forms remain intact.
+    (() => {
+      const list = document.getElementById('vaccine-list');
+      const search = document.getElementById('vaccine-search');
+      const status = document.getElementById('vaccine-status-filter');
+      const sort = document.getElementById('vaccine-sort');
+      const count = document.getElementById('vaccine-results-count');
+      const empty = document.getElementById('no-matching-vaccines');
+      const rows = Array.from(list.querySelectorAll('.vaccine-row'));
+
+      function refreshList() {
+        const query = search.value.trim().toLocaleLowerCase();
+        const today = new Date();
+        const localToday = [today.getFullYear(),
+          String(today.getMonth() + 1).padStart(2, '0'),
+          String(today.getDate()).padStart(2, '0')].join('-');
+        const ordered = [...rows].sort((a, b) => {
+          const nameA = a.dataset.vaccineName.toLocaleLowerCase();
+          const nameB = b.dataset.vaccineName.toLocaleLowerCase();
+          const dateCompare = a.dataset.dueDate.localeCompare(b.dataset.dueDate);
+          const nameCompare = nameA.localeCompare(nameB);
+          if (sort.value === 'date-desc') return -dateCompare || nameCompare;
+          if (sort.value === 'name-asc') return nameCompare || dateCompare;
+          if (sort.value === 'name-desc') return -nameCompare || dateCompare;
+          return dateCompare || nameCompare;
+        });
+
+        let visible = 0;
+        for (const row of ordered) {
+          list.appendChild(row); // Reorder existing DOM nodes; forms and tokens are preserved.
+          const completed = row.dataset.completed === '1';
+          const overdue = !completed && row.dataset.dueDate < localToday;
+          const matchesStatus = status.value === 'all' ||
+            (status.value === 'completed' && completed) ||
+            (status.value === 'pending' && !completed) ||
+            (status.value === 'overdue' && overdue) ||
+            (status.value === 'upcoming' && !completed && !overdue);
+          row.hidden = !(row.dataset.vaccineName.toLocaleLowerCase().includes(query) && matchesStatus);
+          if (!row.hidden) visible++;
+        }
+        count.textContent = `Showing ${visible} of ${rows.length} vaccine records`;
+        empty.hidden = visible !== 0;
+      }
+
+      search.addEventListener('input', refreshList);
+      status.addEventListener('change', refreshList);
+      sort.addEventListener('change', refreshList);
+      refreshList();
+    })();
+  </script>
+  <% } %>
 </body>
 </html>
