@@ -22,6 +22,32 @@ function requireLogin(req, res, next) {
   next();
 }
 
+// Only health workers may change vaccine records.
+function requireWorker(req, res, next) {
+  if (!req.session.userId) return res.redirect('/login');
+  if (req.session.userRole !== 'worker') {
+    return res.status(403).send('Health worker access required.');
+  }
+  next();
+}
+
+function isValidDateOnly(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function renderVaccineList(res, childId, message, isError = false) {
+  const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
+  if (!selectedChild) return res.status(404).send('Child not found.');
+  const vaccines = db.prepare(VACCINE_SELECT).all(childId);
+  return res.render('manage-vaccines', {
+    parent: null, children: null, selectedChild, vaccines,
+    error: isError ? message : null,
+    success: isError ? null : message
+  });
+}
+
 const VACCINE_SCHEDULE = [
   { name: 'BCG', monthsAfterBirth: 0 },
   { name: 'DPT 1 + OPV 1 + Hepatitis B1', monthsAfterBirth: 2 },
@@ -305,17 +331,59 @@ app.post('/manage-vaccines/report-reaction', requireLogin, (req, res) => {
   res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: 'Side effect recorded. This will be visible to any worker who views this child\'s record.' });
 });
 
-app.post('/manage-vaccines/add-custom', requireLogin, (req, res) => {
+app.post('/manage-vaccines/add-custom', requireWorker, (req, res) => {
   const { childId, vaccineName, dueDate } = req.body;
+  const name = typeof vaccineName === 'string' ? vaccineName.trim() : '';
+  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0) {
+    return res.status(400).send('Invalid child ID.');
+  }
+  if (!name || name.length > 150 || !isValidDateOnly(dueDate)) {
+    return renderVaccineList(res, childId, 'Enter a vaccine name (1–150 characters) and a valid due date.', true);
+  }
+  if (!db.prepare('SELECT id FROM children WHERE id = ?').get(childId)) {
+    return res.status(404).send('Child not found.');
+  }
 
   db.prepare(
-    'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, recorded_by) VALUES (?, ?, ?, 0, ?)'
-  ).run(childId, vaccineName, dueDate, req.session.userId);
+    'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, is_custom, recorded_by) VALUES (?, ?, ?, 0, 1, ?)'
+  ).run(childId, name, dueDate, req.session.userId);
 
-  const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
-  const vaccines = db.prepare(VACCINE_SELECT).all(childId);
+  return renderVaccineList(res, childId, 'Custom vaccine added.');
+});
 
-  res.render('manage-vaccines', { parent: null, children: null, selectedChild, vaccines, error: null, success: 'Custom vaccine added.' });
+// Edit only uncompleted CUSTOM vaccine entries, never the generated EPI schedule.
+app.post('/manage-vaccines/edit-custom', requireWorker, (req, res) => {
+  const { childId, vaccineId, vaccineName, dueDate } = req.body;
+  const name = typeof vaccineName === 'string' ? vaccineName.trim() : '';
+  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0 ||
+      !Number.isSafeInteger(Number(vaccineId)) || Number(vaccineId) <= 0) {
+    return res.status(400).send('Invalid record ID.');
+  }
+  const record = db.prepare(
+    'SELECT id FROM vaccines WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
+  ).get(vaccineId, childId);
+  if (!record) return res.status(404).send('Editable custom vaccine not found.');
+  if (!name || name.length > 150 || !isValidDateOnly(dueDate)) {
+    return renderVaccineList(res, childId, 'Enter a vaccine name (1–150 characters) and a valid due date.', true);
+  }
+  db.prepare(
+    'UPDATE vaccines SET vaccine_name = ?, due_date = ? WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
+  ).run(name, dueDate, vaccineId, childId);
+  return renderVaccineList(res, childId, 'Custom vaccine updated.');
+});
+
+// Delete only uncompleted CUSTOM vaccine entries after explicit user confirmation.
+app.post('/manage-vaccines/delete-custom', requireWorker, (req, res) => {
+  const { childId, vaccineId } = req.body;
+  if (!Number.isSafeInteger(Number(childId)) || Number(childId) <= 0 ||
+      !Number.isSafeInteger(Number(vaccineId)) || Number(vaccineId) <= 0) {
+    return res.status(400).send('Invalid record ID.');
+  }
+  const result = db.prepare(
+    'DELETE FROM vaccines WHERE id = ? AND child_id = ? AND is_custom = 1 AND completed = 0'
+  ).run(vaccineId, childId);
+  if (result.changes === 0) return res.status(404).send('Deletable custom vaccine not found.');
+  return renderVaccineList(res, childId, 'Custom vaccine deleted.');
 });
 
 const PORT = 3000;

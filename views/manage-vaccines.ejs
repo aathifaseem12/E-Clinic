@@ -152,6 +152,30 @@
                   <button type="submit" style="margin-top:10px; padding:8px 16px; font-size:13px;">Mark done</button>
                 </form>
               <% } %>
+
+              <% if (v.is_custom && !v.completed) { %>
+                <details style="margin-top:12px;">
+                  <summary style="cursor:pointer; font-size:13px; color:var(--clinic-dark);">Edit custom vaccine</summary>
+                  <form action="/manage-vaccines/edit-custom" method="POST" style="margin-top:10px;">
+                    <input type="hidden" name="vaccineId" value="<%= v.id %>">
+                    <input type="hidden" name="childId" value="<%= selectedChild.id %>">
+                    <label>Vaccine name <span class="req">*</span></label>
+                    <input type="text" name="vaccineName" value="<%= v.vaccine_name %>" maxlength="150" required>
+                    <label>Due date <span class="req">*</span></label>
+                    <input type="date" name="dueDate" value="<%= v.due_date %>" required>
+                    <button type="submit" style="margin-top:10px;"><i class="fa-solid fa-floppy-disk"></i> Save changes</button>
+                  </form>
+                </details>
+                <form action="/manage-vaccines/delete-custom" method="POST"
+                      onsubmit="return confirm('Delete this custom vaccine? This cannot be undone.');"
+                      style="margin-top:10px;">
+                  <input type="hidden" name="vaccineId" value="<%= v.id %>">
+                  <input type="hidden" name="childId" value="<%= selectedChild.id %>">
+                  <button type="submit" class="btn-secondary" style="padding:8px 14px; font-size:13px; color:#A03D22;">
+                    <i class="fa-solid fa-trash-can"></i> Delete custom vaccine
+                  </button>
+                </form>
+              <% } %>
             </div>
           <% }); %>
         <% } %>

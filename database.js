@@ -48,6 +48,7 @@ db.exec(`
     vaccine_name TEXT NOT NULL,
     due_date TEXT NOT NULL,
     completed INTEGER NOT NULL DEFAULT 0,
+    is_custom INTEGER NOT NULL DEFAULT 0,
     completed_date TEXT,
     recorded_by INTEGER,
     completed_by INTEGER,
@@ -61,6 +62,14 @@ db.exec(`
     FOREIGN KEY (side_effect_recorded_by) REFERENCES users(id)
   )
 `);
+
+// Existing databases need the new column as well as freshly-created databases.
+// Old rows remain standard records because we cannot reliably infer whether they
+// were created using the custom-vaccine form.
+const vaccineColumns = db.prepare('PRAGMA table_info(vaccines)').all();
+if (!vaccineColumns.some(column => column.name === 'is_custom')) {
+  db.exec('ALTER TABLE vaccines ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0');
+}
 
 console.log('Database and tables created successfully!');
 
