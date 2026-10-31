@@ -249,13 +249,13 @@
 
         <form action="/signup" method="POST" id="signup-form">
           <label>Full name</label>
-          <input type="text" name="name" placeholder="Your full name" required>
+          <input type="text" name="name" maxlength="100" placeholder="Your full name" required>
 
           <label>Email</label>
-          <input type="email" name="email" placeholder="name@example.com" required>
+          <input type="email" name="email" maxlength="254" placeholder="name@example.com" required>
 
           <label>Password</label>
-          <input type="password" name="password" placeholder="At least 8 characters" required>
+          <input type="password" name="password" minlength="8" placeholder="At least 8 characters" required>
 
           <label>Account type</label>
           <input type="hidden" name="role" value="parent">
@@ -269,7 +269,7 @@
 
           <div class="id-fields visible">
             <label for="nic-input">NIC number <span class="req">*</span></label>
-            <input type="text" name="nic" id="nic-input" data-id="true" placeholder="e.g. 199912345678" required>
+            <input type="text" name="nic" id="nic-input" data-id="true" pattern="[0-9]{12}|[0-9]{9}[VvXx]" maxlength="12" placeholder="e.g. 199912345678" required>
             <p class="id-hint">Used by health workers to look up your child's record.</p>
           </div>
 

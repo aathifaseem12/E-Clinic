@@ -39,6 +39,34 @@ function isValidDateOnly(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+// Basic input validation used by forms as well as direct HTTP requests.
+function validId(value) {
+  return typeof value === 'string' && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
+}
+
+function textField(value, maxLength) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return trimmed.length <= maxLength ? trimmed : '';
+}
+
+function todayDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function isValidPastOrToday(value) {
+  return isValidDateOnly(value) && value <= todayDate();
+}
+
+function showChildError(res, message, code = 400) {
+  return res.status(code).render('register-child', { parent: null, error: message, success: null });
+}
+
+function showGrowthError(res, message, code = 400) {
+  return res.status(code).render('add-growth', { parent: null, children: null, error: message, success: null });
+}
+
 function renderVaccineList(res, childId, message, isError = false) {
   const selectedChild = db.prepare('SELECT * FROM children WHERE id = ?').get(childId);
   if (!selectedChild) return res.status(404).send('Child not found.');
@@ -93,30 +121,43 @@ app.get('/signup', (req, res) => {
 });
 
 app.post('/signup', async (req, res) => {
-  const { name, email, password, role, nic } = req.body;
+  const { password, role } = req.body;
+  const name = textField(req.body.name, 100);
+  const email = textField(req.body.email, 254).toLowerCase();
+  const nic = textField(req.body.nic, 12).toUpperCase();
 
-  // Public signup is only for parents. Never trust a role submitted by the browser:
-  // hidden fields and POST bodies can be edited by anyone.
+  // Never allow an unverified health worker account through public signup.
   if (role !== 'parent') {
     return res.status(403).render('signup', {
       error: 'Health worker accounts cannot be created using public signup.'
     });
   }
-  if (typeof nic !== 'string' || nic.trim() === '') {
-    return res.render('signup', { error: 'NIC Number is required for parent accounts.' });
+  if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).render('signup', { error: 'Enter a valid full name and email address.' });
+  }
+  if (typeof password !== 'string' || Buffer.byteLength(password, 'utf8') < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+    return res.status(400).render('signup', { error: 'Password must be between 8 and 72 bytes long.' });
+  }
+  if (!/^(?:\d{12}|\d{9}[VX])$/.test(nic)) {
+    return res.status(400).render('signup', { error: 'Enter a valid 12-digit NIC or old 9-digit NIC followed by V/X.' });
   }
 
   try {
+    // Older accounts may have mixed-case email addresses; prevent duplicates.
+    if (db.prepare('SELECT id FROM users WHERE email = ? COLLATE NOCASE').get(email)) {
+      return res.status(409).render('signup', { error: 'That email or NIC is already registered.' });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const insertUser = db.prepare(
+    db.prepare(
       'INSERT INTO users (name, email, password, role, nic, slmc_number) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    // Assign the only permitted role on the server, never from req.body.
-    insertUser.run(name, email, hashedPassword, 'parent', nic, null);
-    res.redirect('/login');
+    ).run(name, email, hashedPassword, 'parent', nic, null);
+    return res.redirect('/login');
   } catch (err) {
-    console.log(err);
-    res.render('signup', { error: 'That email or NIC is already registered.' });
+    if (err.code && err.code.startsWith('SQLITE_CONSTRAINT')) {
+      return res.status(409).render('signup', { error: 'That email or NIC is already registered.' });
+    }
+    console.error('Signup failed:', err);
+    return res.status(500).render('signup', { error: 'Could not create the account. Please try again.' });
   }
 });
 
@@ -125,8 +166,12 @@ app.get('/login', (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  const { password } = req.body;
+  const email = textField(req.body.email, 254).toLowerCase();
+  if (!email || typeof password !== 'string' || !password) {
+    return res.status(400).render('login', { error: 'Enter your email and password.' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get(email);
 
   if (!user) {
     return res.render('login', { error: 'No account with that email.' });
@@ -200,30 +245,43 @@ app.post('/register-child/search', requireWorker, (req, res) => {
 });
 
 app.post('/register-child/save', requireWorker, (req, res) => {
-  const { parentId, childName, dob, sex } = req.body;
-  const countResult = db.prepare('SELECT COUNT(*) AS count FROM children WHERE parent_id = ?').get(parentId);
-  const birthOrder = countResult.count + 1;
+  const { parentId, dob, sex } = req.body;
+  const childName = textField(req.body.childName, 100);
 
-  const result = db.prepare(
-    'INSERT INTO children (name, date_of_birth, parent_id, birth_order, sex, registered_by) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(childName, dob, parentId, birthOrder, sex, req.session.userId);
+  if (!validId(parentId) || !childName || !isValidPastOrToday(dob) || !['male', 'female'].includes(sex)) {
+    return showChildError(res, 'Enter a valid parent, child name, birth date and sex. Future birth dates are not allowed.');
+  }
+  const parent = db.prepare('SELECT id FROM users WHERE id = ? AND role = ?').get(parentId, 'parent');
+  if (!parent) return showChildError(res, 'The selected parent no longer exists.', 404);
 
-  const newChildId = result.lastInsertRowid;
-
-  const insertVaccine = db.prepare(
-    'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, recorded_by) VALUES (?, ?, ?, 0, ?)'
-  );
-
-  const scheduleToUse = sex === 'female'
-    ? VACCINE_SCHEDULE
-    : VACCINE_SCHEDULE.filter(v => !v.name.includes('Girls'));
-
-  scheduleToUse.forEach(v => {
-    const dueDate = addMonths(dob, v.monthsAfterBirth);
-    insertVaccine.run(newChildId, v.name, dueDate, req.session.userId);
+  // Register the child and their schedule together; errors roll back all inserts.
+  const registerChild = db.transaction(() => {
+    const countResult = db.prepare('SELECT COUNT(*) AS count FROM children WHERE parent_id = ?').get(parentId);
+    const birthOrder = countResult.count + 1;
+    const result = db.prepare(
+      'INSERT INTO children (name, date_of_birth, parent_id, birth_order, sex, registered_by) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(childName, dob, parentId, birthOrder, sex, req.session.userId);
+    const insertVaccine = db.prepare(
+      'INSERT INTO vaccines (child_id, vaccine_name, due_date, completed, recorded_by) VALUES (?, ?, ?, 0, ?)'
+    );
+    const schedule = sex === 'female'
+      ? VACCINE_SCHEDULE : VACCINE_SCHEDULE.filter(v => !v.name.includes('Girls'));
+    schedule.forEach(v => {
+      insertVaccine.run(result.lastInsertRowid, v.name, addMonths(dob, v.monthsAfterBirth), req.session.userId);
+    });
+    return birthOrder;
   });
 
-  res.render('register-child', { parent: null, error: null, success: `${childName} registered successfully as child #${birthOrder}! EPI vaccine schedule created.` });
+  try {
+    const birthOrder = registerChild();
+    return res.render('register-child', {
+      parent: null, error: null,
+      success: `${childName} registered successfully as child #${birthOrder}! EPI vaccine schedule created.`
+    });
+  } catch (err) {
+    console.error('Child registration failed:', err);
+    return showChildError(res, 'Could not register the child. No partial schedule was saved.', 500);
+  }
 });
 
 app.get('/add-growth', requireWorker, (req, res) => {
@@ -249,12 +307,30 @@ app.post('/add-growth/search', requireWorker, (req, res) => {
 
 app.post('/add-growth/save', requireWorker, (req, res) => {
   const { childId, date, weight, height } = req.body;
+  const weightValue = typeof weight === 'string' && weight.trim() !== '' ? Number(weight) : NaN;
+  const heightValue = typeof height === 'string' && height.trim() !== '' ? Number(height) : NaN;
+  if (!validId(childId) || !isValidPastOrToday(date) ||
+      !Number.isFinite(weightValue) || weightValue <= 0 || weightValue > 400 ||
+      !Number.isFinite(heightValue) || heightValue <= 0 || heightValue > 300) {
+    return showGrowthError(res, 'Choose a valid child, a date no later than today, and positive weight/height measurements.');
+  }
+  const child = db.prepare('SELECT id, date_of_birth FROM children WHERE id = ?').get(childId);
+  if (!child) return showGrowthError(res, 'Child not found.', 404);
+  if (date < child.date_of_birth) {
+    return showGrowthError(res, 'Measurement date cannot be before the child was born.');
+  }
 
-  db.prepare(
-    'INSERT INTO growth_records (child_id, date, weight_kg, height_cm, recorded_by) VALUES (?, ?, ?, ?, ?)'
-  ).run(childId, date, weight, height, req.session.userId);
-
-  res.render('add-growth', { parent: null, children: null, error: null, success: 'Growth record added successfully!' });
+  try {
+    db.prepare(
+      'INSERT INTO growth_records (child_id, date, weight_kg, height_cm, recorded_by) VALUES (?, ?, ?, ?, ?)'
+    ).run(childId, date, weightValue, heightValue, req.session.userId);
+    return res.render('add-growth', {
+      parent: null, children: null, error: null, success: 'Growth record added successfully!'
+    });
+  } catch (err) {
+    console.error('Growth record save failed:', err);
+    return showGrowthError(res, 'Could not save the growth record. Please try again.', 500);
+  }
 });
 
 app.get('/manage-vaccines', requireWorker, (req, res) => {
