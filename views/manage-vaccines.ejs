@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manage Vaccines · E-Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    .side-effect-banner {
+      display: flex; gap: 8px; align-items: flex-start;
+      font-size: 12.5px; padding: 8px 10px; border-radius: 6px; margin-top: 6px;
+    }
+    .side-effect-banner.sev-mild { background: #FDF3E2; color: #92650E; }
+    .side-effect-banner.sev-moderate { background: #FBE9DA; color: #A8571F; }
+    .side-effect-banner.sev-severe { background: #FBECE7; color: #A03D22; }
+    .reaction-form { margin-top: 8px; padding: 10px; background: var(--paper-dark); border-radius: 8px; }
+    .reaction-form label { margin: 6px 0 4px; font-size: 12px; }
+    .reaction-form textarea {
+      width: 100%; font-family: 'Inter', sans-serif; font-size: 13px;
+      padding: 8px; border-radius: 6px; border: 1px solid var(--line); resize: vertical;
+    }
+    .toggle-link { font-size: 12px; color: var(--clinic-dark); cursor: pointer; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
+    <div>
+      <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
+      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:760px;">
+    <div class="eyebrow">Worker tool</div>
+    <h1><i class="fa-solid fa-syringe"></i> Manage Vaccines</h1>
+
+    <% if (error) { %>
+      <div class="error"><i class="fa-solid fa-circle-exclamation" style="margin-top:2px;"></i><span><%= error %></span></div>
+    <% } %>
+    <% if (success) { %>
+      <div class="success"><i class="fa-solid fa-circle-check" style="margin-top:2px;"></i><span><%= success %></span></div>
+    <% } %>
+
+    <% if (!children && !selectedChild) { %>
+      <div class="card">
+        <h2 style="font-size:18px;">Find Parent</h2>
+        <form action="/manage-vaccines/search" method="POST">
+          <label>Parent's NIC number <span class="req">*</span></label>
+          <input type="text" name="nic" data-id="true" placeholder="e.g. 199912345678" required>
+          <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        </form>
+      </div>
+    <% } %>
+
+    <% if (children && !selectedChild) { %>
+      <div class="card">
+        <h2 style="font-size:18px;">Select Child</h2>
+        <p style="font-size:13.5px; color:var(--ink-soft);">Parent: <strong style="color:var(--ink);"><%= parent.name %></strong></p>
+        <% children.forEach(child => { %>
+          <form action="/manage-vaccines/select-child" method="POST" style="margin-top:10px;">
+            <input type="hidden" name="childId" value="<%= child.id %>">
+            <button type="submit" class="btn-secondary" style="width:100%; justify-content:space-between;">
+              <span><i class="fa-solid fa-baby"></i>&nbsp; <%= child.name %> (born <%= child.date_of_birth %>)</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </form>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <% if (selectedChild) { %>
+      <div class="card">
+        <h2 style="font-size:18px;">Vaccination Schedule — <%= selectedChild.name %></h2>
+        <% if (!vaccines || vaccines.length === 0) { %>
+          <p>No vaccines on record for this child.</p>
+        <% } else { %>
+          <% vaccines.forEach((v, vi) => { %>
+            <div style="border-bottom:1px solid var(--line); padding:14px 0;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                <div>
+                  <strong><%= v.vaccine_name %></strong>
+                  <div style="font-size:12.5px; color:var(--ink-soft);">Due: <%= v.due_date %></div>
+                </div>
+                <div>
+                  <% if (v.completed) { %>
+                    <span class="status-completed" data-tooltip="Completed on <%= v.completed_date %>"><i class="fa-solid fa-circle-check"></i>Completed</span>
+                  <% } else {
+                    const daysLeft = Math.ceil((new Date(v.due_date) - new Date()) / (1000 * 60 * 60 * 24));
+                    const isOverdue = daysLeft < 0;
+                  %>
+                    <% if (isOverdue) { %>
+                      <span class="status-overdue"><i class="fa-solid fa-triangle-exclamation"></i>Overdue</span>
+                    <% } else { %>
+                      <span class="status-upcoming"><i class="fa-solid fa-clock"></i>Upcoming</span>
+                    <% } %>
+                  <% } %>
+                </div>
+              </div>
+
+              <% if (v.completed) { %>
+                <!-- Existing side effect, visible to whichever worker views this child next -->
+                <% if (v.side_effects) { %>
+                  <div class="side-effect-banner sev-<%= v.side_effect_severity %>">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px;"></i>
+                    <span>
+                      <strong>Reaction reported (<%= v.side_effect_severity %>):</strong> <%= v.side_effects %>
+                      <br><span style="opacity:0.75;">Reported by <%= v.side_effect_reporter_name %><% if (v.side_effect_reporter_slmc) { %> (SLMC: <%= v.side_effect_reporter_slmc %>)<% } %> on <%= v.side_effect_date %></span>
+                    </span>
+                  </div>
+                <% } %>
+
+                <div style="margin-top:6px;">
+                  <span class="toggle-link" onclick="document.getElementById('reaction-form-<%= vi %>').style.display = document.getElementById('reaction-form-<%= vi %>').style.display === 'block' ? 'none' : 'block';">
+                    <i class="fa-solid fa-notes-medical"></i> <%= v.side_effects ? 'Update reaction report' : 'Report a reaction to this dose' %>
+                  </span>
+                </div>
+
+                <div class="reaction-form" id="reaction-form-<%= vi %>" style="display:none;">
+                  <form action="/manage-vaccines/report-reaction" method="POST">
+                    <input type="hidden" name="vaccineId" value="<%= v.id %>">
+                    <input type="hidden" name="childId" value="<%= selectedChild.id %>">
+                    <label>What happened?</label>
+                    <textarea name="sideEffects" rows="2" placeholder="e.g. Mild fever and swelling at injection site, resolved in 2 days" required><%= v.side_effects || '' %></textarea>
+                    <label>Severity</label>
+                    <select name="severity" required>
+                      <option value="mild" <%= v.side_effect_severity === 'mild' ? 'selected' : '' %>>Mild</option>
+                      <option value="moderate" <%= v.side_effect_severity === 'moderate' ? 'selected' : '' %>>Moderate</option>
+                      <option value="severe" <%= v.side_effect_severity === 'severe' ? 'selected' : '' %>>Severe</option>
+                    </select>
+                    <button type="submit" style="margin-top:10px; padding:8px 16px; font-size:13px;"><i class="fa-solid fa-floppy-disk"></i> Save Report</button>
+                  </form>
+                </div>
+              <% } else { %>
+                <!-- Mark complete, with optional side-effect entry at the same time -->
+                <form action="/manage-vaccines/complete" method="POST" style="margin-top:8px;">
+                  <input type="hidden" name="vaccineId" value="<%= v.id %>">
+                  <input type="hidden" name="childId" value="<%= selectedChild.id %>">
+                  <details>
+                    <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Optional: note any immediate reaction while marking done</summary>
+                    <div style="margin-top:8px;">
+                      <label>Reaction (leave blank if none)</label>
+                      <textarea name="sideEffects" rows="2" placeholder="e.g. Crying and mild fever after injection" style="width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:8px; border-radius:6px; border:1px solid var(--line);"></textarea>
+                      <label>Severity (if reaction noted)</label>
+                      <select name="severity">
+                        <option value="mild">Mild</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="severe">Severe</option>
+                      </select>
+                    </div>
+                  </details>
+                  <button type="submit" style="margin-top:10px; padding:8px 16px; font-size:13px;">Mark done</button>
+                </form>
+              <% } %>
+            </div>
+          <% }); %>
+        <% } %>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:18px;">Add Custom Vaccine</h2>
+        <form action="/manage-vaccines/add-custom" method="POST">
+          <input type="hidden" name="childId" value="<%= selectedChild.id %>">
+          <label>Vaccine name <span class="req">*</span></label>
+          <input type="text" name="vaccineName" placeholder="e.g. Influenza (seasonal)" required>
+          <label>Due date <span class="req">*</span></label>
+          <input type="date" name="dueDate" required>
+          <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-plus"></i> Add Vaccine</button>
+        </form>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

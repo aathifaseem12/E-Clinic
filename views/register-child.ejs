@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register a Child · E-Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <nav>
+    <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
+    <div>
+      <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
+      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:560px;">
+    <div class="eyebrow">Worker tool</div>
+    <h1><i class="fa-solid fa-baby"></i> Register a Child</h1>
+
+    <% if (error) { %>
+      <div class="error"><i class="fa-solid fa-circle-exclamation" style="margin-top:2px;"></i><span><%= error %></span></div>
+    <% } %>
+    <% if (success) { %>
+      <div class="success"><i class="fa-solid fa-circle-check" style="margin-top:2px;"></i><span><%= success %></span></div>
+    <% } %>
+
+    <div class="step-list">
+      <div class="step-pill <%= !parent ? 'active' : '' %>">1. Find parent</div>
+      <div class="step-pill <%= parent ? 'active' : '' %>">2. Child details</div>
+    </div>
+
+    <% if (!parent) { %>
+      <div class="card">
+        <h2 style="font-size:18px;">Find Parent</h2>
+        <form action="/register-child/search" method="POST">
+          <label>Parent's NIC number <span class="req">*</span></label>
+          <input type="text" name="nic" data-id="true" placeholder="e.g. 199912345678" required>
+          <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        </form>
+      </div>
+    <% } else { %>
+      <div class="card">
+        <h2 style="font-size:18px;">Add Child Details</h2>
+        <p style="font-size:13.5px; color:var(--ink-soft);">Registering child for <strong style="color:var(--ink);"><%= parent.name %></strong> (NIC: <%= parent.nic %>)</p>
+
+        <form action="/register-child/save" method="POST">
+          <input type="hidden" name="parentId" value="<%= parent.id %>">
+
+          <label>Child's name <span class="req">*</span></label>
+          <input type="text" name="childName" required>
+
+          <label>Date of birth <span class="req">*</span></label>
+          <input type="date" name="dob" required>
+
+          <label>Sex <span class="req">*</span></label>
+          <select name="sex" required>
+            <option value="">-- Select --</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+
+          <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-floppy-disk"></i> Register Child</button>
+        </form>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

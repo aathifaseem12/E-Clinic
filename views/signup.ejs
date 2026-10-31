@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sign Up · E-Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root {
+      --paper: #F6F1E4;
+      --paper-dark: #EDE6D2;
+      --ink: #20303D;
+      --ink-soft: #5B6B76;
+      --clinic: #2B6C7F;
+      --clinic-dark: #1E4E5C;
+      --coral: #D65B3D;
+      --sage: #7A9B5C;
+      --line: #DCD3BC;
+      --card: #FFFDF8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .wrap {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 860px) {
+      .wrap { grid-template-columns: 1fr; }
+      .cover { min-height: 220px; }
+    }
+
+    .cover {
+      background: var(--clinic-dark);
+      color: var(--paper);
+      padding: 48px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(246,241,228,0.05) 0px, rgba(246,241,228,0.05) 1px, transparent 1px, transparent 28px);
+    }
+    .seal {
+      width: 64px;
+      height: 64px;
+      border: 1.5px solid rgba(246,241,228,0.55);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      margin-bottom: 28px;
+    }
+    .cover h1 {
+      font-family: 'Fraunces', serif;
+      font-weight: 500;
+      font-style: italic;
+      font-size: 30px;
+      line-height: 1.25;
+      margin: 0 0 14px;
+    }
+    .cover p {
+      font-size: 14.5px;
+      line-height: 1.65;
+      color: rgba(246,241,228,0.8);
+      margin: 0;
+      max-width: 280px;
+    }
+    .cover-foot {
+      font-size: 12.5px;
+      color: rgba(246,241,228,0.55);
+      border-top: 1px solid rgba(246,241,228,0.18);
+      padding-top: 16px;
+      line-height: 1.6;
+    }
+
+    .form-side {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 36px 36px 32px;
+      position: relative;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 22px; right: 22px; top: 14px;
+      border-top: 1px dashed var(--line);
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--clinic);
+      font-weight: 600;
+      margin: 12px 0 6px;
+    }
+    .card h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 24px;
+      margin: 0 0 24px;
+      color: var(--ink);
+    }
+
+    .alert {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13.5px;
+      padding: 11px 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .alert-error { background: #FBECE7; color: #A03D22; border: 1px solid #EFCBB9; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      margin: 16px 0 6px;
+    }
+    label .req { color: var(--coral); }
+    input, select {
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-size: 14.5px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #FFFEFB;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--clinic);
+      box-shadow: 0 0 0 3px rgba(43,108,127,0.12);
+    }
+    input[data-id="true"] {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.4px;
+    }
+
+    .role-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .role-tab {
+      border: 1px solid var(--line);
+      background: #FFFEFB;
+      border-radius: 9px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .role-tab i { font-size: 18px; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+    .role-tab span { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+    .role-tab.active { border-color: var(--clinic); background: #EAF2F1; }
+    .role-tab.active i, .role-tab.active span { color: var(--clinic-dark); }
+
+    .id-fields {
+      display: none;
+      border-left: 2px solid var(--line);
+      padding-left: 14px;
+      margin-top: 8px;
+    }
+    .id-fields.visible { display: block; }
+    .id-hint {
+      font-size: 12px;
+      color: var(--ink-soft);
+      margin-top: -2px;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 26px;
+      background: var(--clinic-dark);
+      color: var(--paper);
+      border: none;
+      border-radius: 9px;
+      padding: 13px;
+      font-size: 14.5px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button[type="submit"]:hover { background: var(--clinic); }
+
+    .foot-link {
+      text-align: center;
+      font-size: 13.5px;
+      color: var(--ink-soft);
+      margin-top: 20px;
+    }
+    .foot-link a { color: var(--clinic-dark); font-weight: 500; text-decoration: none; }
+    .foot-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="cover">
+      <div>
+        <div class="seal">CHDR</div>
+        <h1>The Child Health<br>Development Record,<br>digitized.</h1>
+        <p>One account, one role. Parents track their child's growth and vaccines; health workers register and update records under their own name.</p>
+      </div>
+      <div class="cover-foot">
+        Every entry in this system is attributed to the account that made it — parent or health worker — so the record stays accurate and accountable.
+      </div>
+    </div>
+
+    <div class="form-side">
+      <div class="card">
+        <div class="eyebrow">Create account</div>
+        <h2>Sign up</h2>
+
+        <% if (error) { %>
+          <div class="alert alert-error">
+            <i class="fa-solid fa-circle-exclamation" style="margin-top:2px;"></i>
+            <span><%= error %></span>
+          </div>
+        <% } %>
+
+        <form action="/signup" method="POST" id="signup-form">
+          <label>Full name</label>
+          <input type="text" name="name" placeholder="Your full name" required>
+
+          <label>Email</label>
+          <input type="email" name="email" placeholder="name@example.com" required>
+
+          <label>Password</label>
+          <input type="password" name="password" placeholder="At least 8 characters" required>
+
+          <label>I am a</label>
+          <input type="hidden" name="role" id="role-input" value="parent">
+          <div class="role-tabs">
+            <div class="role-tab active" data-role="parent" id="tab-parent">
+              <i class="fa-solid fa-people-roof"></i>
+              <span>Parent</span>
+            </div>
+            <div class="role-tab" data-role="worker" id="tab-worker">
+              <i class="fa-solid fa-user-doctor"></i>
+              <span>Health worker</span>
+            </div>
+          </div>
+
+          <div class="id-fields visible" id="parent-fields">
+            <label>NIC number <span class="req">*</span></label>
+            <input type="text" name="nic" id="nic-input" data-id="true" placeholder="e.g. 199912345678">
+            <p class="id-hint">Used by health workers to look up your child's record.</p>
+          </div>
+
+          <div class="id-fields" id="worker-fields">
+            <label>NIC number <span class="req">*</span></label>
+            <input type="text" name="nic_worker" id="nic-worker-input" data-id="true" placeholder="e.g. 199912345678">
+            <label>SLMC registration number <span class="req">*</span></label>
+            <input type="text" name="slmcNumber" id="slmc-input" data-id="true" placeholder="e.g. SLMC 45231">
+            <p class="id-hint">Both are required to verify you as a registered health worker.</p>
+          </div>
+
+          <button type="submit"><i class="fa-solid fa-arrow-right-to-bracket"></i>&nbsp; Create account</button>
+        </form>
+
+        <p class="foot-link">Already have an account? <a href="/login">Log in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tabParent = document.getElementById('tab-parent');
+    const tabWorker = document.getElementById('tab-worker');
+    const roleInput = document.getElementById('role-input');
+    const parentFields = document.getElementById('parent-fields');
+    const workerFields = document.getElementById('worker-fields');
+    const nicInput = document.getElementById('nic-input');
+    const nicWorkerInput = document.getElementById('nic-worker-input');
+    const slmcInput = document.getElementById('slmc-input');
+    const form = document.getElementById('signup-form');
+
+    function setRole(role) {
+      roleInput.value = role;
+      if (role === 'parent') {
+        tabParent.classList.add('active');
+        tabWorker.classList.remove('active');
+        parentFields.classList.add('visible');
+        workerFields.classList.remove('visible');
+        nicInput.required = true;
+        nicWorkerInput.required = false;
+        slmcInput.required = false;
+      } else {
+        tabWorker.classList.add('active');
+        tabParent.classList.remove('active');
+        workerFields.classList.add('visible');
+        parentFields.classList.remove('visible');
+        nicWorkerInput.required = true;
+        slmcInput.required = true;
+        nicInput.required = false;
+      }
+    }
+
+    tabParent.addEventListener('click', () => setRole('parent'));
+    tabWorker.addEventListener('click', () => setRole('worker'));
+
+    form.addEventListener('submit', () => {
+      if (roleInput.value === 'worker') {
+        nicInput.value = nicWorkerInput.value;
+      }
+    });
+
+    setRole('parent');
+  </script>
+</body>
+</html>

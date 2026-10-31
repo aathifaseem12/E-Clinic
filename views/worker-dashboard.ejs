@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Worker Dashboard · E-Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <nav>
+    <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
+    <div>
+      <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
+      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="eyebrow">Health worker</div>
+    <h1>Welcome, <%= userName %></h1>
+    <p style="color:var(--ink-soft); margin-bottom:28px;">Every record you add or update is saved under your name, so parents always know who to contact about an entry.</p>
+
+    <div class="tile-grid">
+      <a href="/register-child" class="tile">
+        <div class="tile-icon"><i class="fa-solid fa-baby"></i></div>
+        <h3>Register a Child <i class="fa-solid fa-arrow-right tile-arrow"></i></h3>
+        <p>Look up a parent by NIC and add their child to the system, with an auto-generated vaccine schedule.</p>
+      </a>
+
+      <a href="/add-growth" class="tile">
+        <div class="tile-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <h3>Add Growth Record <i class="fa-solid fa-arrow-right tile-arrow"></i></h3>
+        <p>Record a child's weight and height at a checkup, plotted against WHO growth standards.</p>
+      </a>
+
+      <a href="/manage-vaccines" class="tile">
+        <div class="tile-icon"><i class="fa-solid fa-syringe"></i></div>
+        <h3>Manage Vaccines <i class="fa-solid fa-arrow-right tile-arrow"></i></h3>
+        <p>Mark vaccines as completed or add a custom vaccine to a child's schedule.</p>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

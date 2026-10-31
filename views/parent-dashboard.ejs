@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Parent Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    .child-select-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .child-select-card:hover { border-color: var(--clinic); transform: translateY(-2px); }
+    .child-select-card .avatar {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: #EAF2F1;
+      color: var(--clinic-dark);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px;
+      margin-bottom: 12px;
+    }
+    .child-select-card h3 { font-size: 16.5px; margin-bottom: 2px; }
+    .child-select-card .meta { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 12px; }
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mini-badge {
+      font-size: 11.5px; font-weight: 600;
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .mini-badge.b-normal { background: #EEF3E7; color: #4C6B34; }
+    .mini-badge.b-warn { background: #FDF3E2; color: #92650E; }
+    .mini-badge.b-danger { background: #FBECE7; color: #A03D22; }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13.5px; color: var(--clinic-dark);
+      text-decoration: none; margin-bottom: 18px; font-weight: 500;
+    }
+    .back-link:hover { text-decoration: underline; }
+    #child-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .child-detail { display: none; }
+
+    .growth-picker-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 6px; }
+    .metric-box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .metric-box:hover { border-color: var(--clinic); transform: translateY(-2px); }
+    .metric-box-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .metric-box-head .label { font-size: 13.5px; font-weight: 600; color: var(--ink); display:flex; align-items:center; gap:6px; }
+    .metric-box-head .latest { font-family: 'Fraunces', serif; font-size: 15px; color: var(--clinic-dark); }
+    .metric-box canvas { width: 100% !important; height: 70px !important; }
+    .metric-box .hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; }
+    .growth-full { display: none; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
+    <div>
+      <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
+      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1><i class="fa-solid fa-user"></i>Welcome, <%= userName %></h1>
+
+    <%
+      const totalChildren = children.length;
+      let upcomingCount = 0;
+      let overdueCount = 0;
+      const today = new Date();
+      children.forEach(child => {
+        child.vaccines.forEach(v => {
+          if (!v.completed) {
+            if (new Date(v.due_date) < today) overdueCount++;
+            else upcomingCount++;
+          }
+        });
+      });
+    %>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <i class="fa-solid fa-children"></i>
+        <div>
+          <div class="stat-number"><%= totalChildren %></div>
+          <div class="stat-label">Registered Children</div>
+        </div>
+      </div>
+      <div class="stat-box">
+        <i class="fa-solid fa-syringe"></i>
+        <div>
+          <div class="stat-number"><%= upcomingCount %></div>
+          <div class="stat-label">Upcoming Vaccines</div>
+        </div>
+      </div>
+      <div class="stat-box">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+          <div class="stat-number"><%= overdueCount %></div>
+          <div class="stat-label">Overdue Vaccines</div>
+        </div>
+      </div>
+    </div>
+
+    <h2><i class="fa-solid fa-baby"></i>Your Children</h2>
+
+    <% if (children.length === 0) { %>
+      <div class="card">
+        <p>No children registered yet. Ask your health worker to register your child.</p>
+      </div>
+    <% } else { %>
+
+      <!-- ===== Child picker (default view) ===== -->
+      <div id="child-picker">
+        <% children.forEach((child, index) => {
+          const childUpcoming = child.vaccines.filter(v => !v.completed && new Date(v.due_date) >= today).length;
+          const childOverdue = child.vaccines.filter(v => !v.completed && new Date(v.due_date) < today).length;
+        %>
+          <div class="child-select-card" onclick="showChild(<%= index %>)">
+            <div class="avatar"><i class="fa-solid fa-baby"></i></div>
+            <h3><%= child.name %></h3>
+            <div class="meta">
+              born <%= child.date_of_birth %> · <%= child.sex === 'male' ? '♂ Male' : '♀ Female' %>
+            </div>
+            <div class="badge-row">
+              <% if (childOverdue > 0) { %>
+                <span class="mini-badge b-danger"><%= childOverdue %> overdue</span>
+              <% } %>
+              <% if (childUpcoming > 0) { %>
+                <span class="mini-badge b-warn"><%= childUpcoming %> upcoming</span>
+              <% } %>
+              <% if (childOverdue === 0 && childUpcoming === 0) { %>
+                <span class="mini-badge b-normal">All vaccines done</span>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+
+      <!-- ===== Per-child detail views (hidden until selected) ===== -->
+      <% children.forEach((child, index) => {
+        const dobCalc = new Date(child.date_of_birth);
+        const earlyRecs = child.growthRecords.filter(r => ((new Date(r.date) - dobCalc) / (1000*60*60*24*30.44)) < 24);
+        const lateRecs = child.growthRecords.filter(r => ((new Date(r.date) - dobCalc) / (1000*60*60*24*30.44)) >= 24);
+      %>
+        <div class="child-detail" id="detail-<%= index %>">
+          <a href="#" class="back-link" onclick="showPicker(); return false;">
+            <i class="fa-solid fa-arrow-left"></i> Back to your children
+          </a>
+
+          <div class="card">
+            <h3>
+              <i class="fa-solid fa-baby"></i><%= child.name %>
+              <span style="font-size:14px; color:#666; font-weight:400;">
+                (born <%= child.date_of_birth %> · <%= child.sex === 'male' ? '♂ Male' : '♀ Female' %>)
+              </span>
+            </h3>
+            <p style="font-size:13px; color:#888; margin-top:-8px;">
+              <i class="fa-solid fa-user-doctor"></i>
+              Registered by <%= child.registered_by_name || 'Unknown' %><% if (child.registered_by_slmc) { %> (SLMC: <%= child.registered_by_slmc %>)<% } %>
+            </p>
+
+            <% if (child.growthRecords.length === 0) { %>
+              <p>No growth records yet.</p>
+            <% } else { %>
+
+              <!-- Preview boxes: click to expand full chart -->
+              <div class="growth-picker-row" id="growth-picker-<%= index %>">
+                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'weight-age')">
+                  <div class="metric-box-head">
+                    <span class="label"><i class="fa-solid fa-weight-scale"></i> Weight (by age)</span>
+                    <% if (earlyRecs.length > 0) { %>
+                      <span class="latest"><%= earlyRecs[earlyRecs.length - 1].weight_kg %> kg</span>
+                    <% } %>
+                  </div>
+                  <canvas id="mini-weight-age-<%= index %>"></canvas>
+                  <div class="hint">
+                    <% if (earlyRecs.length > 0) { %>
+                      Tap to see full chart vs WHO standard (birth–2y)
+                    <% } else { %>
+                      No records yet from before age 2
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'height')">
+                  <div class="metric-box-head">
+                    <span class="label"><i class="fa-solid fa-ruler-vertical"></i> Height</span>
+                    <span class="latest"><%= child.growthRecords[child.growthRecords.length - 1].height_cm %> cm</span>
+                  </div>
+                  <canvas id="mini-height-<%= index %>"></canvas>
+                  <div class="hint">Tap to see full chart vs WHO standard</div>
+                </div>
+
+                <div class="metric-box" onclick="showGrowthDetail(<%= index %>, 'weight-height')">
+                  <div class="metric-box-head">
+                    <span class="label"><i class="fa-solid fa-weight-scale"></i> Weight vs Height</span>
+                    <span class="latest"><%= child.growthRecords[child.growthRecords.length - 1].weight_kg %> kg</span>
+                  </div>
+                  <canvas id="mini-weight-height-<%= index %>"></canvas>
+                  <div class="hint">Tap to see full chart vs WHO standard (birth–5y)</div>
+                </div>
+              </div>
+
+              <!-- Full Weight-by-age chart (hidden until its box is clicked) -->
+              <div class="growth-full" id="growth-full-weight-age-<%= index %>">
+                <a href="#" class="back-link" onclick="showGrowthPicker(<%= index %>); return false;">
+                  <i class="fa-solid fa-arrow-left"></i> Back to growth summary
+                </a>
+                <div style="margin-bottom: 10px; padding: 8px 12px; background:#f8f9fa; border-radius:6px; display:inline-block;">
+                  <small style="font-weight:600; color:#444;">WHO Reference Zones: </small>
+                  <small>
+                    <span style="display:inline-block;width:14px;height:14px;background:#22c55e;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#166534;font-weight:600;">Normal</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#eab308;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#854d0e;font-weight:600;">At Risk</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#f97316;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#9a3412;font-weight:600;">Underweight/Short</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#ef4444;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#991b1b;font-weight:600;">Severely Low</span>
+                  </small>
+                </div>
+                <canvas id="weight-age-chart-<%= index %>" height="280"></canvas>
+              </div>
+
+              <!-- Full Height-by-age chart (hidden until its box is clicked) -->
+              <div class="growth-full" id="growth-full-height-<%= index %>">
+                <a href="#" class="back-link" onclick="showGrowthPicker(<%= index %>); return false;">
+                  <i class="fa-solid fa-arrow-left"></i> Back to growth summary
+                </a>
+                <div style="margin-bottom: 10px; padding: 8px 12px; background:#f8f9fa; border-radius:6px; display:inline-block;">
+                  <small style="font-weight:600; color:#444;">WHO Reference Zones: </small>
+                  <small>
+                    <span style="display:inline-block;width:14px;height:14px;background:#22c55e;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#166534;font-weight:600;">Normal</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#eab308;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#854d0e;font-weight:600;">At Risk</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#f97316;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#9a3412;font-weight:600;">Underweight/Short</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#ef4444;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#991b1b;font-weight:600;">Severely Low</span>
+                  </small>
+                </div>
+                <canvas id="height-chart-<%= index %>" height="280"></canvas>
+              </div>
+
+              <!-- Full Weight-vs-Height chart -->
+              <div class="growth-full" id="growth-full-weight-height-<%= index %>">
+                <a href="#" class="back-link" onclick="showGrowthPicker(<%= index %>); return false;">
+                  <i class="fa-solid fa-arrow-left"></i> Back to growth summary
+                </a>
+                <div style="margin-bottom: 10px; padding: 8px 12px; background:#f8f9fa; border-radius:6px; display:inline-block;">
+                  <small style="font-weight:600; color:#444;">WHO Reference Zones: </small>
+                  <small>
+                    <span style="display:inline-block;width:14px;height:14px;background:#22c55e;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#166534;font-weight:600;">Normal</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#eab308;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#854d0e;font-weight:600;">At Risk</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#f97316;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#9a3412;font-weight:600;">Underweight/Short</span>
+                    <span style="display:inline-block;width:14px;height:14px;background:#ef4444;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle;"></span><span style="color:#991b1b;font-weight:600;">Severely Low</span>
+                  </small>
+                </div>
+                <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-4px;">
+                  <i class="fa-solid fa-circle-info"></i> This chart plots weight against the child's actual height, from birth through 5 years — the same reference the CHDR booklet uses.
+                </p>
+                <canvas id="weight-height-chart-<%= index %>" height="280"></canvas>
+              </div>
+
+              <table style="margin-top:16px;">
+                <tr>
+                  <th>Date</th>
+                  <th>Weight (kg)</th>
+                  <th>Height (cm)</th>
+                  <th>Recorded By</th>
+                </tr>
+                <% child.growthRecords.forEach(rec => { %>
+                  <tr>
+                    <td><%= rec.date %></td>
+                    <td><%= rec.weight_kg %></td>
+                    <td><%= rec.height_cm %></td>
+                    <td style="font-size:12px; color:#888;">
+                      <%= rec.recorded_by_name || 'Unknown' %><% if (rec.recorded_by_slmc) { %> (SLMC: <%= rec.recorded_by_slmc %>)<% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </table>
+            <% } %>
+
+            <h4><i class="fa-solid fa-syringe"></i>Vaccination Schedule</h4>
+            <% if (child.vaccines.length === 0) { %>
+              <p>No vaccine schedule yet.</p>
+            <% } else { %>
+              <table>
+                <tr>
+                  <th>Vaccine</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Recorded By</th>
+                </tr>
+                <% child.vaccines.forEach(v => { %>
+                  <tr>
+                    <td><%= v.vaccine_name %></td>
+                    <td><%= v.due_date %></td>
+                    <td>
+                      <% if (v.completed) { %>
+                        <span class="status-completed" data-tooltip="Completed on <%= v.completed_date %>"><i class="fa-solid fa-circle-check"></i>Completed</span>
+                      <% } else {
+                        const daysLeft = Math.ceil((new Date(v.due_date) - new Date()) / (1000 * 60 * 60 * 24));
+                        const isOverdue = daysLeft < 0;
+                        const tooltipText = isOverdue ? `Overdue by ${Math.abs(daysLeft)} day(s)` : `Due in ${daysLeft} day(s)`;
+                      %>
+                        <% if (isOverdue) { %>
+                          <span class="status-overdue" data-tooltip="<%= tooltipText %>"><i class="fa-solid fa-triangle-exclamation"></i>Overdue</span>
+                        <% } else { %>
+                          <span class="status-upcoming" data-tooltip="<%= tooltipText %>"><i class="fa-solid fa-clock"></i>Upcoming</span>
+                        <% } %>
+                      <% } %>
+                    </td>
+                    <td style="font-size:12px; color:#888;">
+                      <% if (v.completed && v.completed_by_name) { %>
+                        Completed by <%= v.completed_by_name %><% if (v.completed_by_slmc) { %> (SLMC: <%= v.completed_by_slmc %>)<% } %>
+                      <% } else if (v.recorded_by_name) { %>
+                        Added by <%= v.recorded_by_name %><% if (v.recorded_by_slmc) { %> (SLMC: <%= v.recorded_by_slmc %>)<% } %>
+                      <% } else { %>
+                        —
+                      <% } %>
+                    </td>
+                  </tr>
+                  <% if (v.side_effects) { %>
+                    <tr>
+                      <td colspan="4" style="background:#FBE9DA; font-size:12.5px; padding:8px 14px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <strong>Reaction reported (<%= v.side_effect_severity %>):</strong> <%= v.side_effects %>
+                        — reported by <%= v.side_effect_reporter_name %> on <%= v.side_effect_date %>
+                      </td>
+                    </tr>
+                  <% } %>
+                <% }); %>
+              </table>
+            <% } %>
+          </div>
+        </div>
+      <% }); %>
+
+    <% } %>
+  </div>
+
+  <script>
+    const allChildrenData = <%- JSON.stringify(children) %>;
+    const fullChartsBuilt = new Set();  // tracks "index-metric" strings
+    const miniChartsBuilt = new Set();  // tracks child index
+
+    // ---- WHO reference anchors: [x, median, -1SD, -2SD, -3SD] ----
+    // Weight-for-age & Height-for-age: x = months after birth.
+    // Weight-for-height: x = height in cm (the CHDR booklet's separate 2-5y chart).
+
+    const weightAnchors = [
+      [0,3.3,2.9,2.5,2.1],[1,4.5,3.9,3.4,2.9],[2,5.6,4.9,4.3,3.8],[3,6.4,5.6,4.9,4.3],
+      [4,7.0,6.2,5.4,4.7],[5,7.5,6.7,5.8,5.1],[6,7.9,7.1,6.1,5.3],[7,8.3,7.4,6.4,5.6],
+      [8,8.6,7.7,6.7,5.8],[9,8.9,8.0,6.9,6.0],[10,9.2,8.2,7.1,6.2],[11,9.4,8.4,7.3,6.3],
+      [12,9.6,8.6,7.5,6.5],[13,9.9,8.8,7.7,6.6],[14,10.1,9.0,7.8,6.8],[15,10.3,9.2,8.0,6.9],
+      [16,10.5,9.4,8.2,7.1],[17,10.7,9.6,8.3,7.2],[18,10.9,9.8,8.5,7.4],[19,11.1,10.0,8.7,7.5],
+      [20,11.3,10.2,8.9,7.7],[21,11.5,10.4,9.0,7.8],[22,11.8,10.6,9.2,8.0],[23,12.0,10.8,9.4,8.1],
+      [24,12.2,11.0,9.6,8.3]
+    ];
+
+    const heightBoyAnchors = [
+      [0,49.9,47.5,45.2,42.9],[1,54.7,52.2,49.8,47.4],[2,58.4,55.8,53.2,50.7],[3,61.4,58.7,56.1,53.5],
+      [4,63.9,61.1,58.4,55.8],[5,65.9,63.1,60.4,57.8],[6,67.6,64.8,62.1,59.4],[7,69.2,66.3,63.6,60.9],
+      [8,70.6,67.7,65.0,62.3],[9,72.0,69.0,66.3,63.6],[10,73.3,70.3,67.6,64.8],[11,74.5,71.5,68.7,66.0],
+      [12,75.7,72.7,69.9,67.2],[13,76.9,73.8,71.0,68.3],[14,78.0,74.9,72.1,69.3],[15,79.1,76.0,73.2,70.4],
+      [16,80.2,77.0,74.2,71.4],[17,81.2,78.0,75.3,72.5],[18,82.3,79.1,76.3,73.5],[19,83.2,80.1,77.3,74.5],
+      [20,84.2,81.0,78.3,75.5],[21,85.1,82.0,79.3,76.5],[22,86.0,82.9,80.2,77.4],[23,86.9,83.7,81.1,78.4],
+      [24,87.8,84.6,82.0,79.3],
+      [30,91.9,89.3,86.7,84.0],[36,95.4,92.4,89.5,86.5],[42,98.4,95.2,92.0,88.8],
+      [48,101.2,97.8,94.4,91.0],[54,103.8,100.2,96.6,93.0],[60,106.1,102.3,98.4,94.6]
+    ];
+
+    const heightGirlAnchors = [
+      [0,49.1,46.8,44.5,42.3],[1,53.7,51.3,48.9,46.5],[2,57.1,54.7,52.3,49.9],[3,59.8,57.4,54.9,52.5],
+      [4,62.1,59.7,57.2,54.7],[5,64.0,61.5,59.0,56.5],[6,65.7,63.2,60.7,58.2],[7,67.3,64.7,62.2,59.7],
+      [8,68.7,66.1,63.6,61.0],[9,70.1,67.5,64.9,62.4],[10,71.5,68.8,66.2,63.7],[11,72.8,70.1,67.5,64.9],
+      [12,74.0,71.3,68.7,66.2],[13,75.2,72.5,69.9,67.3],[14,76.4,73.6,71.0,68.5],[15,77.5,74.8,72.1,69.6],
+      [16,78.6,75.8,73.2,70.6],[17,79.7,76.9,74.2,71.7],[18,80.7,77.9,75.3,72.7],[19,81.7,79.0,76.3,73.7],
+      [20,82.7,80.0,77.3,74.8],[21,83.7,81.0,78.3,75.7],[22,84.6,81.9,79.3,76.7],[23,85.5,82.9,80.2,77.7],
+      [24,86.4,83.8,81.1,78.6],
+      [30,90.7,87.8,85.0,82.2],[36,95.1,92.0,88.9,85.7],[42,98.4,95.0,91.6,88.2],
+      [48,101.4,97.7,94.1,90.5],[54,104.0,100.1,96.3,92.4],[60,106.2,102.3,98.4,94.4]
+    ];
+
+    // WHO Weight-for-Length/Height, from newborn to 5 years — x = height/length in cm.
+    // 45-60cm covers infancy (measured lying down); 65cm+ matches the standing-height
+    // range used once a child is old enough to be measured that way.
+    const weightForHeightBoyAnchors = [
+      [45,2.4,2.1,1.9,1.6],[50,3.3,2.9,2.5,2.2],[55,4.4,3.9,3.4,3.0],[60,5.8,5.2,4.5,4.0],
+      [65,7.4,6.7,6.0,5.3],[70,8.6,7.8,6.9,6.1],[75,9.7,8.8,7.8,6.9],[80,10.7,9.7,8.6,7.6],
+      [85,11.7,10.6,9.4,8.3],[90,12.6,11.4,10.1,8.9],[95,13.6,12.3,10.9,9.6],[100,14.6,13.2,11.7,10.3],
+      [105,15.7,14.2,12.6,11.1],[110,16.9,15.3,13.5,11.9],[115,18.3,16.6,14.6,12.9],[120,19.9,18.0,15.9,14.0]
+    ];
+    const weightForHeightGirlAnchors = [
+      [45,2.3,2.0,1.8,1.5],[50,3.2,2.8,2.4,2.1],[55,4.2,3.7,3.2,2.8],[60,5.5,4.9,4.3,3.7],
+      [65,7.0,6.3,5.6,4.9],[70,8.1,7.3,6.5,5.7],[75,9.3,8.4,7.4,6.5],[80,10.3,9.3,8.2,7.2],
+      [85,11.3,10.2,9.0,7.9],[90,12.3,11.1,9.8,8.6],[95,13.3,12.0,10.6,9.3],[100,14.3,12.9,11.4,10.0],
+      [105,15.4,13.9,12.3,10.8],[110,16.6,15.0,13.2,11.6],[115,18.0,16.3,14.3,12.5],[120,19.6,17.7,15.5,13.6]
+    ];
+
+    // Linear interpolation between the two anchors surrounding `x` (a month or a height).
+    function interpAt(x, anchors) {
+      const clamped = Math.max(anchors[0][0], Math.min(anchors[anchors.length - 1][0], x));
+      let lo = anchors[0], hi = anchors[anchors.length - 1];
+      for (let i = 0; i < anchors.length - 1; i++) {
+        if (anchors[i][0] <= clamped && clamped <= anchors[i + 1][0]) {
+          lo = anchors[i]; hi = anchors[i + 1]; break;
+        }
+      }
+      const span = hi[0] - lo[0];
+      const frac = span === 0 ? 0 : (clamped - lo[0]) / span;
+      return [1, 2, 3, 4].map(idx => lo[idx] + (hi[idx] - lo[idx]) * frac);
+    }
+
+    function getZone(x, value, anchors) {
+      const [, s1, s2, s3] = interpAt(x, anchors);
+      if (value >= s1) return { label: 'Normal' };
+      if (value >= s2) return { label: 'At Risk' };
+      if (value >= s3) return { label: 'Underweight/Short' };
+      return { label: 'Severely Low' };
+    }
+
+    function buildBandDatasets(anchors) {
+      return [
+        { label: 'Normal zone', data: anchors.map(a => ({ x: a[0], y: a[1] })),
+          borderColor: 'rgba(34,197,94,0.7)', backgroundColor: 'rgba(34,197,94,0.25)',
+          fill: '+1', showLine: true, pointRadius: 0, tension: 0.25, borderWidth: 1.5, borderDash: [4,4], order: 5, isChildSeries: false },
+        { label: 'At Risk zone', data: anchors.map(a => ({ x: a[0], y: a[2] })),
+          borderColor: 'rgba(234,179,8,0.7)', backgroundColor: 'rgba(234,179,8,0.25)',
+          fill: '+1', showLine: true, pointRadius: 0, tension: 0.25, borderWidth: 1.5, borderDash: [4,4], order: 6, isChildSeries: false },
+        { label: 'Underweight zone', data: anchors.map(a => ({ x: a[0], y: a[3] })),
+          borderColor: 'rgba(249,115,22,0.7)', backgroundColor: 'rgba(249,115,22,0.3)',
+          fill: '+1', showLine: true, pointRadius: 0, tension: 0.25, borderWidth: 1.5, borderDash: [4,4], order: 7, isChildSeries: false },
+        { label: 'Severely Low zone', data: anchors.map(a => ({ x: a[0], y: a[4] })),
+          borderColor: 'rgba(239,68,68,0.7)', backgroundColor: 'rgba(239,68,68,0.35)',
+          fill: { target: { value: 0 }, above: 'rgba(239,68,68,0.35)' },
+          showLine: true, pointRadius: 0, tension: 0.25, borderWidth: 1.5, borderDash: [4,4], order: 8, isChildSeries: false }
+      ];
+    }
+
+    function buildChildDataset(label, points, color) {
+      return {
+        label: label, data: points, borderColor: color, backgroundColor: color,
+        showLine: true, pointRadius: 6, pointHoverRadius: 8,
+        pointBackgroundColor: color, pointBorderColor: 'white', pointBorderWidth: 2,
+        tension: 0.3, borderWidth: 3, order: 1, isChildSeries: true
+      };
+    }
+
+    function ageInMonths(dob, dateStr) {
+      return parseFloat(((new Date(dateStr) - dob) / (1000 * 60 * 60 * 24 * 30.44)).toFixed(1));
+    }
+
+    // xUnit is 'months' or 'cm' — controls the tooltip title wording ("Age: 8 months" vs "Height: 90 cm")
+    function fullChartOptions(titleText, xAxisLabel, yLabel, anchors, yUnit, xMin, xMax, xStep, xUnit) {
+      return {
+        plugins: {
+          title: { display: true, text: titleText, font: { size: 13, weight: 'bold' } },
+          legend: { display: false },
+          tooltip: {
+            filter: (item) => item.dataset.isChildSeries === true,
+            callbacks: {
+              title: function(items) {
+                if (!items.length) return '';
+                const prefix = xUnit === 'cm' ? 'Height: ' : 'Age: ';
+                return prefix + items[0].parsed.x + ' ' + xUnit;
+              },
+              label: function(context) {
+                return context.dataset.label.replace(' (kg)', '').replace(' (cm)', '') + ': ' + context.parsed.y + ' ' + yUnit;
+              },
+              afterLabel: function(context) {
+                const zone = getZone(context.parsed.x, context.parsed.y, anchors);
+                return 'Zone: ' + zone.label;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { type: 'linear', min: xMin, max: xMax, title: { display: true, text: xAxisLabel }, ticks: { stepSize: xStep } },
+          y: { title: { display: true, text: yLabel }, min: 0 }
+        }
+      };
+    }
+
+    function splitRecords(child, dob) {
+      const early = child.growthRecords.filter(rec => ageInMonths(dob, rec.date) < 24);
+      const late = child.growthRecords.filter(rec => ageInMonths(dob, rec.date) >= 24);
+      return { early, late };
+    }
+
+    // ---- Mini "preview box" sparklines: built once per child, when their detail opens ----
+    function buildMiniCharts(index) {
+      if (miniChartsBuilt.has(index)) return;
+      const child = allChildrenData[index];
+      if (!child || child.growthRecords.length === 0) return;
+
+      const dob = new Date(child.date_of_birth);
+      const { early, late } = splitRecords(child, dob);
+
+      const weightAgeEl = document.getElementById('mini-weight-age-' + index);
+      if (weightAgeEl && early.length > 0) {
+        const points = early.map(rec => ({ x: ageInMonths(dob, rec.date), y: rec.weight_kg }));
+        new Chart(weightAgeEl, {
+          type: 'line',
+          data: { datasets: [{ data: points, borderColor: '#1d4e89', backgroundColor: '#1d4e89', pointRadius: 3, tension: 0.3, borderWidth: 2 }] },
+          options: {
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { type: 'linear', display: false }, y: { display: false } },
+            elements: { point: { hoverRadius: 3 } }
+          }
+        });
+      }
+
+      const heightEl = document.getElementById('mini-height-' + index);
+      if (heightEl) {
+        const points = child.growthRecords.map(rec => ({ x: ageInMonths(dob, rec.date), y: rec.height_cm }));
+        new Chart(heightEl, {
+          type: 'line',
+          data: { datasets: [{ data: points, borderColor: '#1e7e34', backgroundColor: '#1e7e34', pointRadius: 3, tension: 0.3, borderWidth: 2 }] },
+          options: {
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { type: 'linear', display: false }, y: { display: false } },
+            elements: { point: { hoverRadius: 3 } }
+          }
+        });
+      }
+
+      const weightHeightEl = document.getElementById('mini-weight-height-' + index);
+      if (weightHeightEl) {
+        const points = child.growthRecords.map(rec => ({ x: rec.height_cm, y: rec.weight_kg }));
+        new Chart(weightHeightEl, {
+          type: 'line',
+          data: { datasets: [{ data: points, borderColor: '#8B5E3C', backgroundColor: '#8B5E3C', pointRadius: 3, tension: 0.3, borderWidth: 2 }] },
+          options: {
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { type: 'linear', display: false }, y: { display: false } },
+            elements: { point: { hoverRadius: 3 } }
+          }
+        });
+      }
+
+      miniChartsBuilt.add(index);
+    }
+
+    // ---- Full chart for one metric, built lazily the first time its box is clicked ----
+    // metric is one of: 'weight-age', 'height', 'weight-height'
+    function buildFullChart(index, metric) {
+      const key = index + '-' + metric;
+      if (fullChartsBuilt.has(key)) return;
+      const child = allChildrenData[index];
+      if (!child || child.growthRecords.length === 0) return;
+
+      const dob = new Date(child.date_of_birth);
+      const isMale = child.sex === 'male';
+      const { early, late } = splitRecords(child, dob);
+
+      if (metric === 'weight-age') {
+        const points = early.map(rec => ({ x: ageInMonths(dob, rec.date), y: rec.weight_kg }));
+        new Chart(document.getElementById('weight-age-chart-' + index), {
+          type: 'scatter',
+          data: { datasets: [...buildBandDatasets(weightAnchors), buildChildDataset(child.name + ' Weight (kg)', points, '#1d4e89')] },
+          options: fullChartOptions(
+            child.name + ' — Weight (kg) vs WHO Standard, birth–2 years',
+            'Age (months)', 'Weight (kg)', weightAnchors, 'kg',
+            0, 24, 2, 'months'
+          )
+        });
+      } else if (metric === 'height') {
+        const points = child.growthRecords.map(rec => ({ x: ageInMonths(dob, rec.date), y: rec.height_cm }));
+        const anchors = isMale ? heightBoyAnchors : heightGirlAnchors;
+        new Chart(document.getElementById('height-chart-' + index), {
+          type: 'scatter',
+          data: { datasets: [...buildBandDatasets(anchors), buildChildDataset(child.name + ' Height (cm)', points, '#1e7e34')] },
+          options: fullChartOptions(
+            child.name + ' — Height (cm) vs WHO ' + (isMale ? 'Boys' : 'Girls') + ' Standard (0–5 years)',
+            'Age (months)', 'Height (cm)', anchors, 'cm',
+            0, 60, 6, 'months'
+          )
+        });
+      } else if (metric === 'weight-height') {
+        const el = document.getElementById('weight-height-chart-' + index);
+        if (!el) return;
+        const anchors = isMale ? weightForHeightBoyAnchors : weightForHeightGirlAnchors;
+        const points = child.growthRecords.map(rec => ({ x: rec.height_cm, y: rec.weight_kg }));
+        new Chart(el, {
+          type: 'scatter',
+          data: { datasets: [...buildBandDatasets(anchors), buildChildDataset(child.name + ' Weight (kg)', points, '#1d4e89')] },
+          options: fullChartOptions(
+            child.name + ' — Weight vs Height (WHO Standard, birth–5 years)',
+            'Height (cm)', 'Weight (kg)', anchors, 'kg',
+            45, 125, 10, 'cm'
+          )
+        });
+      }
+
+      fullChartsBuilt.add(key);
+    }
+
+    function showGrowthDetail(index, metric) {
+      document.getElementById('growth-picker-' + index).style.display = 'none';
+      ['weight-age', 'height', 'weight-height'].forEach(m => {
+        const el = document.getElementById('growth-full-' + m + '-' + index);
+        if (el) el.style.display = 'none';
+      });
+      const target = document.getElementById('growth-full-' + metric + '-' + index);
+      if (target) target.style.display = 'block';
+      buildFullChart(index, metric);
+    }
+
+    function showGrowthPicker(index) {
+      ['weight-age', 'height', 'weight-height'].forEach(m => {
+        const el = document.getElementById('growth-full-' + m + '-' + index);
+        if (el) el.style.display = 'none';
+      });
+      document.getElementById('growth-picker-' + index).style.display = 'grid';
+    }
+
+    function showChild(index) {
+      document.getElementById('child-picker').style.display = 'none';
+      document.querySelectorAll('.child-detail').forEach(el => el.style.display = 'none');
+      const target = document.getElementById('detail-' + index);
+      target.style.display = 'block';
+      buildMiniCharts(index);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showPicker() {
+      document.querySelectorAll('.child-detail').forEach(el => el.style.display = 'none');
+      document.getElementById('child-picker').style.display = 'grid';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>

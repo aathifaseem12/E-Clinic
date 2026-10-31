@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Log In · E-Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root {
+      --paper: #F6F1E4;
+      --paper-dark: #EDE6D2;
+      --ink: #20303D;
+      --ink-soft: #5B6B76;
+      --clinic: #2B6C7F;
+      --clinic-dark: #1E4E5C;
+      --coral: #D65B3D;
+      --sage: #7A9B5C;
+      --line: #DCD3BC;
+      --card: #FFFDF8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .wrap {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 860px) {
+      .wrap { grid-template-columns: 1fr; }
+      .cover { min-height: 220px; }
+    }
+
+    .cover {
+      background: var(--clinic-dark);
+      color: var(--paper);
+      padding: 48px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(246,241,228,0.05) 0px, rgba(246,241,228,0.05) 1px, transparent 1px, transparent 28px);
+    }
+    .seal {
+      width: 64px;
+      height: 64px;
+      border: 1.5px solid rgba(246,241,228,0.55);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      margin-bottom: 28px;
+    }
+    .cover h1 {
+      font-family: 'Fraunces', serif;
+      font-weight: 500;
+      font-style: italic;
+      font-size: 30px;
+      line-height: 1.25;
+      margin: 0 0 14px;
+    }
+    .cover p {
+      font-size: 14.5px;
+      line-height: 1.65;
+      color: rgba(246,241,228,0.8);
+      margin: 0;
+      max-width: 280px;
+    }
+    .cover-foot {
+      font-size: 12.5px;
+      color: rgba(246,241,228,0.55);
+      border-top: 1px solid rgba(246,241,228,0.18);
+      padding-top: 16px;
+      line-height: 1.6;
+    }
+
+    .form-side {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 36px 36px 32px;
+      position: relative;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 22px; right: 22px; top: 14px;
+      border-top: 1px dashed var(--line);
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--clinic);
+      font-weight: 600;
+      margin: 12px 0 6px;
+    }
+    .card h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 24px;
+      margin: 0 0 24px;
+      color: var(--ink);
+    }
+
+    .alert {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13.5px;
+      padding: 11px 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .alert-error { background: #FBECE7; color: #A03D22; border: 1px solid #EFCBB9; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      margin: 16px 0 6px;
+    }
+    input {
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-size: 14.5px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #FFFEFB;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus {
+      border-color: var(--clinic);
+      box-shadow: 0 0 0 3px rgba(43,108,127,0.12);
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 26px;
+      background: var(--clinic-dark);
+      color: var(--paper);
+      border: none;
+      border-radius: 9px;
+      padding: 13px;
+      font-size: 14.5px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button[type="submit"]:hover { background: var(--clinic); }
+
+    .foot-link {
+      text-align: center;
+      font-size: 13.5px;
+      color: var(--ink-soft);
+      margin-top: 20px;
+    }
+    .foot-link a { color: var(--clinic-dark); font-weight: 500; text-decoration: none; }
+    .foot-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="cover">
+      <div>
+        <div class="seal">CHDR</div>
+        <h1>Welcome back<br>to the Child Health<br>Development Record.</h1>
+        <p>Log in to view your child's growth chart and vaccine schedule, or, if you're a health worker, to add or update a record.</p>
+      </div>
+      <div class="cover-foot">
+        Every entry in this system is attributed to the account that made it — parent or health worker — so the record stays accurate and accountable.
+      </div>
+    </div>
+
+    <div class="form-side">
+      <div class="card">
+        <div class="eyebrow">Welcome back</div>
+        <h2>Log in</h2>
+
+        <% if (error) { %>
+          <div class="alert alert-error">
+            <i class="fa-solid fa-circle-exclamation" style="margin-top:2px;"></i>
+            <span><%= error %></span>
+          </div>
+        <% } %>
+
+        <form action="/login" method="POST">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="name@example.com" required>
+
+          <label>Password</label>
+          <input type="password" name="password" placeholder="Your password" required>
+
+          <button type="submit"><i class="fa-solid fa-arrow-right-to-bracket"></i>&nbsp; Log in</button>
+        </form>
+
+        <p class="foot-link">Don't have an account? <a href="/signup">Sign up</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
