@@ -210,6 +210,7 @@
         <% } %>
 
         <form action="/login" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label>Email</label>
           <input type="email" name="email" placeholder="name@example.com" required>
 

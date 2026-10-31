@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const crypto = require('node:crypto');
 const bcrypt = require('bcrypt');
 const db = require('./database');
 
@@ -9,11 +10,49 @@ app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 
+// Production needs a stable, private secret supplied by the deployment environment.
+// Local development uses a fresh cryptographic secret on each start (which logs
+// everyone out after a restart), instead of committing a reusable secret to Git.
+const configuredSecret = process.env.ECLINIC_SESSION_SECRET;
+if (process.env.NODE_ENV === 'production' && (!configuredSecret || configuredSecret.length < 32)) {
+  throw new Error('Set ECLINIC_SESSION_SECRET to a private string of at least 32 characters in production.');
+}
+const sessionSecret = configuredSecret && configuredSecret.length >= 32
+  ? configuredSecret : crypto.randomBytes(32).toString('hex');
+if (!configuredSecret && process.env.NODE_ENV !== 'production') {
+  console.warn('Using a temporary local session secret; log in again after restarting the server.');
+}
+
 app.use(session({
-  secret: 'change-this-to-something-random-later',
+  name: 'eclinic.sid',
+  secret: sessionSecret,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 8 * 60 * 60 * 1000
+  }
 }));
+
+// Every HTML form has an unguessable token tied to the user's session.
+// Verify it BEFORE a write route is allowed to change records.
+app.use((req, res, next) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+  }
+  res.locals.csrfToken = req.session.csrfToken;
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+
+  const submitted = req.body && req.body._csrf;
+  const expected = req.session.csrfToken;
+  if (typeof submitted !== 'string' || !/^[0-9a-f]{64}$/.test(submitted) ||
+      !crypto.timingSafeEqual(Buffer.from(submitted, 'hex'), Buffer.from(expected, 'hex'))) {
+    return res.status(403).send('Invalid or expired form token. Reload the page and try again.');
+  }
+  return next();
+});
 
 function requireLogin(req, res, next) {
   if (!req.session.userId) {
@@ -204,18 +243,33 @@ app.post('/login', async (req, res) => {
     return res.render('login', { error: 'Incorrect password.' });
   }
 
-  req.session.userId = user.id;
-  req.session.userRole = user.role;
-  req.session.userName = user.name;
-
-  res.redirect('/dashboard');
-});
-
-app.get('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.redirect('/login');
+  // Renew the session ID at login to prevent session fixation. Old form
+  // tokens are invalidated, so dashboards will render a fresh token.
+  req.session.regenerate((err) => {
+    if (err) {
+      console.error('Session regeneration failed:', err);
+      return res.status(500).render('login', { error: 'Login session could not be created. Please try again.' });
+    }
+    req.session.userId = user.id;
+    req.session.userRole = user.role;
+    req.session.userName = user.name;
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    return res.redirect('/dashboard');
   });
 });
+
+// Logout changes the session, so it must be a CSRF-protected POST.
+app.post('/logout', requireLogin, (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Logout failed:', err);
+      return res.status(500).send('Could not log out. Please try again.');
+    }
+    res.clearCookie('eclinic.sid');
+    return res.redirect('/login');
+  });
+});
+app.get('/logout', (req, res) => res.redirect('/dashboard'));
 
 app.get('/dashboard', requireLogin, (req, res) => {
   if (req.session.userRole === 'parent') {

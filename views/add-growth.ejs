@@ -11,7 +11,10 @@
     <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
     <div>
       <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
-      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+      <form action="/logout" method="POST" class="nav-logout-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="nav-logout-button"><i class="fa-solid fa-right-from-bracket"></i>Log out</button>
+      </form>
     </div>
   </nav>
 
@@ -35,6 +38,7 @@
       <div class="card">
         <h2 style="font-size:18px;">Find Parent</h2>
         <form action="/add-growth/search" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label>Parent's NIC number <span class="req">*</span></label>
           <input type="text" name="nic" data-id="true" placeholder="e.g. 199912345678" required>
           <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
@@ -46,6 +50,7 @@
         <p style="font-size:13.5px; color:var(--ink-soft);">Parent: <strong style="color:var(--ink);"><%= parent.name %></strong></p>
 
         <form action="/add-growth/save" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label>Select child <span class="req">*</span></label>
           <select name="childId" required>
             <% children.forEach(child => { %>

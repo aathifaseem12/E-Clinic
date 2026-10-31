@@ -69,7 +69,10 @@
     <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
     <div>
       <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
-      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+      <form action="/logout" method="POST" class="nav-logout-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="nav-logout-button"><i class="fa-solid fa-right-from-bracket"></i>Log out</button>
+      </form>
     </div>
   </nav>
 

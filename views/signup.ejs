@@ -248,6 +248,7 @@
         <% } %>
 
         <form action="/signup" method="POST" id="signup-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label>Full name</label>
           <input type="text" name="name" maxlength="100" placeholder="Your full name" required>
 

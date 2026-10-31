@@ -27,7 +27,10 @@
     <div class="brand"><i class="fa-solid fa-house-medical"></i>E-Clinic</div>
     <div>
       <a href="/dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</a>
-      <a href="/logout"><i class="fa-solid fa-right-from-bracket"></i>Log out</a>
+      <form action="/logout" method="POST" class="nav-logout-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="nav-logout-button"><i class="fa-solid fa-right-from-bracket"></i>Log out</button>
+      </form>
     </div>
   </nav>
 
@@ -46,6 +49,7 @@
       <div class="card">
         <h2 style="font-size:18px;">Find Parent</h2>
         <form action="/manage-vaccines/search" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label>Parent's NIC number <span class="req">*</span></label>
           <input type="text" name="nic" data-id="true" placeholder="e.g. 199912345678" required>
           <button type="submit" style="margin-top:18px;"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
@@ -59,6 +63,7 @@
         <p style="font-size:13.5px; color:var(--ink-soft);">Parent: <strong style="color:var(--ink);"><%= parent.name %></strong></p>
         <% children.forEach(child => { %>
           <form action="/manage-vaccines/select-child" method="POST" style="margin-top:10px;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="hidden" name="childId" value="<%= child.id %>">
             <button type="submit" class="btn-secondary" style="width:100%; justify-content:space-between;">
               <span><i class="fa-solid fa-baby"></i>&nbsp; <%= child.name %> (born <%= child.date_of_birth %>)</span>
@@ -118,6 +123,7 @@
 
                 <div class="reaction-form" id="reaction-form-<%= vi %>" style="display:none;">
                   <form action="/manage-vaccines/report-reaction" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="vaccineId" value="<%= v.id %>">
                     <input type="hidden" name="childId" value="<%= selectedChild.id %>">
                     <label>What happened?</label>
@@ -134,6 +140,7 @@
               <% } else { %>
                 <!-- Mark complete, with optional side-effect entry at the same time -->
                 <form action="/manage-vaccines/complete" method="POST" style="margin-top:8px;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <input type="hidden" name="vaccineId" value="<%= v.id %>">
                   <input type="hidden" name="childId" value="<%= selectedChild.id %>">
                   <details>
@@ -157,6 +164,7 @@
                 <details style="margin-top:12px;">
                   <summary style="cursor:pointer; font-size:13px; color:var(--clinic-dark);">Edit custom vaccine</summary>
                   <form action="/manage-vaccines/edit-custom" method="POST" style="margin-top:10px;">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="vaccineId" value="<%= v.id %>">
                     <input type="hidden" name="childId" value="<%= selectedChild.id %>">
                     <label>Vaccine name <span class="req">*</span></label>
@@ -169,6 +177,7 @@
                 <form action="/manage-vaccines/delete-custom" method="POST"
                       onsubmit="return confirm('Delete this custom vaccine? This cannot be undone.');"
                       style="margin-top:10px;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <input type="hidden" name="vaccineId" value="<%= v.id %>">
                   <input type="hidden" name="childId" value="<%= selectedChild.id %>">
                   <button type="submit" class="btn-secondary" style="padding:8px 14px; font-size:13px; color:#A03D22;">
@@ -184,6 +193,7 @@
       <div class="card">
         <h2 style="font-size:18px;">Add Custom Vaccine</h2>
         <form action="/manage-vaccines/add-custom" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" name="childId" value="<%= selectedChild.id %>">
           <label>Vaccine name <span class="req">*</span></label>
           <input type="text" name="vaccineName" placeholder="e.g. Influenza (seasonal)" required>
